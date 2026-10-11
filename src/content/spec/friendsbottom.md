@@ -34,9 +34,9 @@
 ```json
 {
     "title": "Lililijiabei",
-    "imgurl": "https://blog.wanshushan.top/favicon/n2.webp",
+    "imgurl": "https://lililijiabei.wanshushan.top/favicon/avatar.jpg",
     "desc": "In adversity, life is reborn.",
-    "siteurl": "https://blog.wanshushan.top",
+    "siteurl": "https://lililijiabei.wanshushan.top",
     "tags": ["个人博客"]
 }
 ```

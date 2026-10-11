@@ -3,6 +3,7 @@ import { Icon } from "astro-icon/components";
 import { navBarConfig, navbarCenterText } from "../config";
 import { LinkPresets } from "../constants/link-presets";
 import { LinkPreset, type NavBarLink } from "../types/config";
+import { url } from "../utils/url-utils";
 import NavMenuPanel from "./widget/NavMenuPanel.astro";
 
 const className = Astro.props.class;
@@ -20,6 +21,8 @@ let links: NavBarLink[] = navBarConfig.links.map(
 ---
 <div id="navbar" class="z-50 onload-animation">
     <div class:list={[className, "w-full h-[4.5rem] relative flex items-center justify-end px-4"]}>
+        <!-- 空白处（顶栏整条）点一下就回首页；文字块与菜单按钮在它上层 -->
+        <a href={url('/')} class="absolute inset-0" aria-label="回到首页"></a>
         <!-- 两个只装文字的框：分别居中在左右两条链条的正上方（位置由 CSS 按内容宽度算） -->
         <div class="nav-block nav-block-l">
             <span class="nav-line nav-line-1 font-bold text-90">{navbarCenterText.line1.left}</span>
@@ -69,6 +72,7 @@ loadButtonScript();
         /* 宽度 = 外侧空白区宽度 − 一点余量（不要底色、不要边框，只有字） */
         width: calc((100% - var(--content-width)) / 2 - 1.5rem);
         max-width: 24rem;
+        z-index: 1; /* 在“回首页”的透明链接之上 */
     }
     .nav-block-l {
         left: calc((100% - var(--content-width)) / 4);

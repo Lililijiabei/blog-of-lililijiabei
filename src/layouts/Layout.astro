@@ -291,7 +291,8 @@ import {
 	BANNER_HEIGHT,
 	BANNER_HEIGHT_HOME,
 	BANNER_HEIGHT_EXTEND,
-	MAIN_PANEL_OVERLAPS_BANNER_HEIGHT
+	MAIN_PANEL_OVERLAPS_BANNER_HEIGHT,
+	DEFAULT_THEME
 } from "../constants/constants";
 import { siteConfig } from '../config';
 
@@ -361,8 +362,8 @@ setClickOutsideToClose("search-panel", ["search-panel", "search-bar", "search-sw
 
 
 function loadTheme() {
-	const theme = getStoredTheme()
-	setTheme(theme)
+	// 站点固定默认深色：忽略本地存储里可能残留的旧选择（否则访问者可能看到浅色）
+	setTheme(DEFAULT_THEME)
 }
 
 function loadHue() {
