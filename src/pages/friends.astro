@@ -4,6 +4,7 @@ import { getCollection, getEntry, render } from "astro:content";
 import Giscus from "@components/misc/Giscus.astro";
 import Markdown from "@components/misc/Markdown.astro";
 import friendsConfigJson from "../content/spec/friends_config.json";
+import { giscusConfig } from "../config";
 import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
 import MainGridLayout from "../layouts/MainGridLayout.astro";
@@ -70,14 +71,16 @@ const items = itemsFromJson.length > 0 ? itemsFromJson : itemsFromCollection;
             <Markdown class="mt-2">
                 <Bottom />
             </Markdown>
-            <!-- 评论组件 -->
-            <Giscus
-                repo="wanshushan/wanshushan-blog-comments"
-                repoId="R_kgDORYt6mw"
-                category="Announcements"
-                categoryId="DIC_kwDORYt6m84C3MHg"
-                lang="zh-CN"
-            />
+            <!-- 评论组件（统一走 src/config.ts 的 giscusConfig，改一处即可） -->
+            {giscusConfig.enable && (
+                <Giscus
+                    repo={giscusConfig.repo}
+                    repoId={giscusConfig.repoId}
+                    category={giscusConfig.category}
+                    categoryId={giscusConfig.categoryId}
+                    lang={giscusConfig.lang}
+                />
+            )}
         </div>
     </div>
     <!--在此处👇插入随机排列JS脚本 -->

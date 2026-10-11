@@ -28,7 +28,7 @@ import { remarkReadingTime } from "./src/plugins/remark-reading-time.mjs";
 
 // https://astro.build/config
 export default defineConfig({
-	site: "https://blogtemplate.wanshushan.top",
+	site: "https://wanshushan.top",
 	base: "/",
 	trailingSlash: "always",
 	integrations: [
@@ -95,7 +95,7 @@ export default defineConfig({
 				textMarkers: {
 					delHue: 0,
 					insHue: 180,
-					markHue: 250,
+					markHue: 300,
 				},
 			},
 			frames: {

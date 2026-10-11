@@ -1,0 +1,169 @@
+---
+// 主页装饰：漂浮的小蝴蝶（纯装饰层，pointer-events-none，不干扰点击）
+//
+// 素材：背景图里那只真蝴蝶（亮度抠像 + 连通域过滤，只留本体，圆点/十字已剔除）
+// 行为：
+//   · 18 只（6×3 抖动网格排布，保证两两不会挨太近）
+//   · 一半镜像翻转（朝向左右各半），尺寸/倾角/透明度/扇翅频率各不相同
+//   · 扇翅：同一张图按「翅膀中轴」用 clip-path 切左右半翅，各自绕中轴 rotateY（3D）
+//   · 漂移：两种方向的关键帧，带 360° 旋转 → 像在乱飞
+import { Image } from "astro:assets";
+import butterflyDeco from "../assets/images/butterfly-deco.png";
+
+// 翅膀中轴在图片里的水平位置（抠像时实测 = 47%）
+const AXIS = 47;
+
+const butterflies = [
+	// 手工散布的位置（故意不规则），彼此间距 ≥ 约 250px，不会挨太近
+	{ x: 6, y: 12, size: 62, dur: 24, delay: -3, flap: 2.4, op: 0.34, rot: -22, flip: false },
+	{ x: 19, y: 46, size: 40, dur: 31, delay: -12, flap: 3.6, op: 0.26, rot: 14, flip: true },
+	{ x: 9, y: 78, size: 52, dur: 27, delay: -8, flap: 1.7, op: 0.3, rot: -34, flip: false },
+	{ x: 31, y: 22, size: 34, dur: 35, delay: -19, flap: 3.1, op: 0.24, rot: 28, flip: true },
+	{ x: 44, y: 70, size: 76, dur: 22, delay: -5, flap: 2.0, op: 0.22, rot: -12, flip: false },
+	{ x: 68, y: 16, size: 46, dur: 29, delay: -14, flap: 4.0, op: 0.3, rot: 20, flip: true },
+	{ x: 84, y: 40, size: 66, dur: 26, delay: -7, flap: 2.7, op: 0.28, rot: -26, flip: false },
+	{ x: 74, y: 76, size: 36, dur: 33, delay: -21, flap: 1.5, op: 0.32, rot: 10, flip: true },
+	{ x: 94, y: 62, size: 56, dur: 23, delay: -10, flap: 3.4, op: 0.25, rot: -18, flip: false },
+];
+---
+
+<div id="butterfly-field" aria-hidden="true">
+    {butterflies.map((b) => (
+        <div
+            class="bf"
+            style={`left:${b.x}%;top:${b.y}%;width:${b.size}px;animation-duration:${b.dur}s;animation-delay:${b.delay}s;animation-name:${b.x < 50 ? "bf-drift-cw" : "bf-drift-ccw"};--bf-op:${b.op};--bf-flap:${b.flap}s;--bf-rot:${b.rot}deg;--bf-dir:${b.flip ? -1 : 1};--bf-axis:${AXIS}%`}
+        >
+            <div class="bf-tilt">
+                <div class="bf3d">
+                    <!-- 左半翅（切掉右半） -->
+                    <Image src={butterflyDeco} alt="" class="wing wl" width={256} height={128} loading="lazy"></Image>
+                    <!-- 右半翅（切掉左半） -->
+                    <Image src={butterflyDeco} alt="" class="wing wr" width={256} height={128} loading="lazy"></Image>
+                </div>
+            </div>
+        </div>
+    ))}
+</div>
+
+<style>
+    #butterfly-field {
+        position: fixed;
+        inset: 0;
+        z-index: 20; /* 在横幅(10)之上、卡片内容(30)与导航(50)之下 */
+        overflow: hidden;
+        pointer-events: none;
+    }
+    .bf {
+        position: absolute;
+        animation-timing-function: ease-in-out;
+        animation-iteration-count: infinite;
+        opacity: var(--bf-op, 0.3);
+        /* 淡色：轻微提亮 + 去饱和，再叠紫色柔光 */
+        filter: brightness(1.12) saturate(0.7) drop-shadow(0 0 8px oklch(0.62 0.2 318 / 0.55));
+    }
+    .bf-tilt {
+        width: 100%;
+        /* 侧视倾角 + 一半镜像翻转 */
+        transform: rotate(var(--bf-rot, -20deg)) scaleX(var(--bf-dir, 1));
+    }
+
+    /* ── clip-path 切左右半翅，各自绕中轴做 3D 扇动 ── */
+    .bf3d {
+        position: relative;
+        width: 100%;
+        perspective: 480px; /* 透视越小，3D 扇动越夸张 */
+        transform-style: preserve-3d;
+    }
+    .bf3d .wing {
+        display: block;
+        width: 100%;
+        height: auto;
+        animation-timing-function: ease-in-out;
+        animation-iteration-count: infinite;
+    }
+    .bf3d .wl {
+        clip-path: inset(0 calc(100% - var(--bf-axis, 47%)) 0 0);
+        transform-origin: var(--bf-axis, 47%) 50%;
+        animation-name: bf-flap-l;
+        animation-duration: var(--bf-flap, 1.5s);
+    }
+    .bf3d .wr {
+        position: absolute;
+        left: 0;
+        top: 0;
+        clip-path: inset(0 0 0 var(--bf-axis, 47%));
+        transform-origin: var(--bf-axis, 47%) 50%;
+        animation-name: bf-flap-r;
+        animation-duration: var(--bf-flap, 1.5s);
+        filter: brightness(0.92); /* 远侧稍暗，做出前后层次 */
+    }
+
+    /* ── 漂浮：不再整圈转，只在「朝上 180°」内摆动（最大 ±24°，加侧视倾角也不会倒） ── */
+    @keyframes bf-drift-cw {
+        0% {
+            transform: translate3d(0, 0, 0) rotate(0deg);
+        }
+        25% {
+            transform: translate3d(26px, -32px, 0) rotate(24deg);
+        }
+        50% {
+            transform: translate3d(-12px, -58px, 0) rotate(-18deg);
+        }
+        75% {
+            transform: translate3d(-30px, -24px, 0) rotate(16deg);
+        }
+        100% {
+            transform: translate3d(0, 0, 0) rotate(0deg);
+        }
+    }
+    @keyframes bf-drift-ccw {
+        0% {
+            transform: translate3d(0, 0, 0) rotate(0deg);
+        }
+        25% {
+            transform: translate3d(-24px, -28px, 0) rotate(-22deg);
+        }
+        50% {
+            transform: translate3d(14px, -54px, 0) rotate(18deg);
+        }
+        75% {
+            transform: translate3d(28px, -20px, 0) rotate(-14deg);
+        }
+        100% {
+            transform: translate3d(0, 0, 0) rotate(0deg);
+        }
+    }
+    /* 左右翅绕中轴镜像开合（幅度加大到 -20° ↔ 62°） */
+    @keyframes bf-flap-l {
+        0%,
+        100% {
+            transform: rotateY(-20deg);
+        }
+        50% {
+            transform: rotateY(62deg);
+        }
+    }
+    @keyframes bf-flap-r {
+        0%,
+        100% {
+            transform: rotateY(20deg);
+        }
+        50% {
+            transform: rotateY(-62deg);
+        }
+    }
+
+    /* 尊重系统的"减少动态效果"设置 */
+    @media (prefers-reduced-motion: reduce) {
+        .bf,
+        .bf3d .wing {
+            animation: none;
+        }
+    }
+    /* 手机屏幕窄，只留 4 只免得杂乱 */
+    @media (max-width: 640px) {
+        .bf:nth-child(n + 5) {
+            display: none;
+        }
+    }
+</style>

@@ -1,12 +1,8 @@
 ---
 import { Icon } from "astro-icon/components";
-import { navBarConfig, siteConfig } from "../config";
+import { navBarConfig, navbarCenterText } from "../config";
 import { LinkPresets } from "../constants/link-presets";
 import { LinkPreset, type NavBarLink } from "../types/config";
-import { url } from "../utils/url-utils";
-import LightDarkSwitch from "./LightDarkSwitch.svelte";
-import Search from "./Search.svelte";
-import DisplaySettings from "./widget/DisplaySettings.svelte";
 import NavMenuPanel from "./widget/NavMenuPanel.astro";
 
 const className = Astro.props.class;
@@ -19,77 +15,29 @@ let links: NavBarLink[] = navBarConfig.links.map(
 		return item;
 	},
 );
+
+// 站内链接只留给移动端菜单（顶部中间已改成两行文字）
 ---
 <div id="navbar" class="z-50 onload-animation">
-    <div class="absolute h-8 left-0 right-0 -top-8 bg-[var(--card-bg)] transition"></div> <!-- used for onload animation -->
-    <div class:list={[
-        className,
-        "card-base !overflow-visible max-w-[var(--page-width)] h-[4.5rem] !rounded-t-none mx-auto flex items-center justify-between px-4"]}>
-        <a href={url('/')} class="btn-plain scale-animation rounded-lg h-[3.25rem] px-5 font-bold active:scale-95">
-            <div class="flex flex-row text-[var(--primary)] items-center text-md">
-                <Icon name="material-symbols:home-outline-rounded" class="text-[1.75rem] mb-1 mr-2" />
-                {siteConfig.title}
-            </div>
-        </a>
-        <div class="hidden md:flex">
-            {links.map((l) => {
-                return <a aria-label={l.name} href={l.external ? l.url : url(l.url)} target={l.external ? "_blank" : null}
-                          class="btn-plain scale-animation rounded-lg h-11 font-bold px-5 active:scale-95"
-                >
-                    <div class="flex items-center">
-                        {l.name}
-                        {l.external && <Icon name="fa6-solid:arrow-up-right-from-square" class="text-[0.875rem] transition -translate-y-[1px] ml-1 text-black/[0.2] dark:text-white/[0.2]"></Icon>}
-                    </div>
-                </a>;
-            })}
+    <div class:list={[className, "w-full h-[4.5rem] relative flex items-center justify-end px-4"]}>
+        <!-- 两个只装文字的框：分别居中在左右两条链条的正上方（位置由 CSS 按内容宽度算） -->
+        <div class="nav-block nav-block-l">
+            <span class="nav-line nav-line-1 font-bold text-90">{navbarCenterText.line1.left}</span>
+            <span class="nav-line nav-line-2 text-75 mt-0.5">{navbarCenterText.line2.left}</span>
         </div>
-        <div class="flex">
-            <!--<SearchPanel client:load>-->
-            <Search client:only="svelte"></Search>
-            {!siteConfig.themeColor.fixed && (
-                    <button aria-label="Display Settings" class="btn-plain scale-animation rounded-lg h-11 w-11 active:scale-90" id="display-settings-switch">
-                        <Icon name="material-symbols:palette-outline" class="text-[1.25rem]"></Icon>
-                    </button>
-            )}
-            <LightDarkSwitch client:only="svelte"></LightDarkSwitch>
-            <button aria-label="Menu" name="Nav Menu" class="btn-plain scale-animation rounded-lg w-11 h-11 active:scale-90 md:!hidden" id="nav-menu-switch">
-                <Icon name="material-symbols:menu-rounded" class="text-[1.25rem]"></Icon>
-            </button>
+        <div class="nav-block nav-block-r">
+            <span class="nav-line nav-line-1 font-bold text-90">{navbarCenterText.line1.right}</span>
+            <span class="nav-line nav-line-2 text-75 mt-0.5">{navbarCenterText.line2.right}</span>
         </div>
+        <button aria-label="Menu" name="Nav Menu" class="btn-plain scale-animation rounded-lg w-11 h-11 active:scale-90 md:!hidden" id="nav-menu-switch">
+            <Icon name="material-symbols:menu-rounded" class="text-[1.25rem]"></Icon>
+        </button>
         <NavMenuPanel links={links}></NavMenuPanel>
-        <DisplaySettings client:only="svelte"></DisplaySettings>
     </div>
 </div>
 
 <script>
-function switchTheme() {
-    if (localStorage.theme === 'dark') {
-        document.documentElement.classList.remove('dark');
-        localStorage.theme = 'light';
-    } else {
-        document.documentElement.classList.add('dark');
-        localStorage.theme = 'dark';
-    }
-}
-
 function loadButtonScript() {
-    let switchBtn = document.getElementById("scheme-switch");
-    if (switchBtn) {
-        switchBtn.onclick = function () {
-            switchTheme()
-        };
-    }
-
-    let settingBtn = document.getElementById("display-settings-switch");
-    if (settingBtn) {
-        settingBtn.onclick = function () {
-            let settingPanel = document.getElementById("display-setting");
-            if (settingPanel) {
-                settingPanel.classList.toggle("float-panel-closed");
-            }
-        };
-    }
-
     let menuBtn = document.getElementById("nav-menu-switch");
     if (menuBtn) {
         menuBtn.onclick = function () {
@@ -104,38 +52,86 @@ function loadButtonScript() {
 loadButtonScript();
 </script>
 
-{import.meta.env.PROD && <script is:inline define:vars={{scriptUrl: url('/pagefind/pagefind.js')}}>
-async function loadPagefind() {
-    try {
-        const response = await fetch(scriptUrl, { method: 'HEAD' });
-        if (!response.ok) {
-            throw new Error(`Pagefind script not found: ${response.status}`);
-        }
-
-        const pagefind = await import(scriptUrl);
-
-        await pagefind.options({
-            excerptLength: 20
-        });
-
-        window.pagefind = pagefind;
-
-        document.dispatchEvent(new CustomEvent('pagefindready'));
-        console.log('Pagefind loaded and initialized successfully, event dispatched.');
-    } catch (error) {
-        console.error('Failed to load Pagefind:', error);
-        window.pagefind = {
-            search: () => Promise.resolve({ results: [] }),
-            options: () => Promise.resolve(),
-        };
-        document.dispatchEvent(new CustomEvent('pagefindloaderror'));
-        console.log('Pagefind load error, event dispatched.');
+<style>
+    /* 顶部两个文字框：各自居中在左右两条链的正上方。
+       链条的水平位置 = （页面宽度 − 内容宽度）/ 4（也就是外侧空白区的中点）。*/
+    .nav-block {
+        position: absolute;
+        /* 相比原来的垂直居中，位置微调 */
+        top: calc(50% - 6.2px); /* 比上一版下移 0.1cm */
+        transform: translate(-50%, -50%);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        line-height: 1.15;
+        /* 宽度 = 外侧空白区宽度 − 一点余量（不要底色、不要边框，只有字） */
+        width: calc((100% - var(--content-width)) / 2 - 1.5rem);
+        max-width: 24rem;
     }
-}
+    .nav-block-l {
+        left: calc((100% - var(--content-width)) / 4);
+    }
+    .nav-block-r {
+        left: calc(100% - (100% - var(--content-width)) / 4);
+    }
+    /* 外侧空白放得下这段文字时（够宽）才显示，否则隐藏 */
+    @media (min-width: 1500px) {
+        .nav-block {
+            display: flex;
+        }
+    }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadPagefind);
-} else {
-    loadPagefind();
-}
-</script>}
+    /* 顶部两行文字：外发光 + 从左到右扫过的高光（不浮动） */
+    .nav-line {
+        /* 深色主题用白光，浅色主题用主题紫，两种主题下都看得见 */
+        --nav-shine: #fff;
+        /* 淡紫色外发光 */
+        --nav-aura: oklch(0.66 0.22 318 / 0.5);
+        position: relative;
+        background-image: linear-gradient(
+            100deg,
+            currentColor 0%,
+            currentColor 36%,
+            var(--nav-shine) 50%,
+            currentColor 64%,
+            currentColor 100%
+        );
+        background-size: 250% 100%;
+        background-repeat: no-repeat;
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        /* 用 drop-shadow 而不是 text-shadow：文字填充色透明时 text-shadow 会从字形里透出来 */
+        filter: drop-shadow(0 0 6px var(--nav-shine)) drop-shadow(0 0 14px color-mix(in oklab, var(--nav-shine) 55%, transparent))
+            drop-shadow(0 0 26px var(--nav-aura));
+        animation: nav-line-sweep 6s linear infinite;
+    }
+    :global(html:not(.dark)) .nav-line {
+        --nav-shine: var(--primary);
+    }
+    /* 屏幕变窄时字也跟着缩（盒子宽度由上面那条响应式规则控制） */
+    .nav-line-1 {
+        font-size: clamp(0.72rem, 1.21vw, 0.97rem);
+    }
+    .nav-line-2 {
+        font-size: clamp(0.58rem, 0.68vw, 0.74rem);
+    }
+    @keyframes nav-line-sweep {
+        from {
+            background-position: 100% 50%;
+        }
+        to {
+            background-position: 0% 50%;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .nav-line {
+            animation: none;
+            background-position: 50% 50%;
+        }
+    }
+</style>
+
+

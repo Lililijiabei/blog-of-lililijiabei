@@ -1,8 +1,4 @@
 ---
-import "@fontsource/roboto/400.css";
-import "@fontsource/roboto/500.css";
-import "@fontsource/roboto/700.css";
-
 import ConfigCarrier from "@components/ConfigCarrier.astro";
 import { profileConfig, siteConfig } from "@/config";
 import {
@@ -10,6 +6,7 @@ import {
 	BANNER_HEIGHT,
 	BANNER_HEIGHT_EXTEND,
 	BANNER_HEIGHT_HOME,
+	CONTENT_WIDTH,
 	DARK_MODE,
 	DEFAULT_THEME,
 	LIGHT_MODE,
@@ -38,6 +35,7 @@ const isHomePage = pathsEqual(Astro.url.pathname, url("/"));
 // defines global css variables
 // why doing this in Layout instead of GlobalStyles: https://github.com/withastro/astro/issues/6728#issuecomment-1502203757
 const configHue = siteConfig.themeColor.hue;
+const themeColorFixed = siteConfig.themeColor.fixed;
 if (!banner || typeof banner !== "string" || banner.trim() === "") {
 	banner = siteConfig.banner.src;
 }
@@ -116,9 +114,9 @@ const bannerSrc = banner?.startsWith("/") ? url(banner) : banner;
 		))}
 
 		<!-- Set the theme before the page is rendered to avoid a flash -->
-		<script is:inline define:vars={{DEFAULT_THEME, LIGHT_MODE, DARK_MODE, AUTO_MODE, BANNER_HEIGHT_EXTEND, PAGE_WIDTH, configHue}}>
-			// Load the theme from local storage
-			const theme = localStorage.getItem('theme') || DEFAULT_THEME;
+		<script is:inline define:vars={{DEFAULT_THEME, LIGHT_MODE, DARK_MODE, AUTO_MODE, BANNER_HEIGHT_EXTEND, PAGE_WIDTH, configHue, themeColorFixed}}>
+			// 亮暗切换按钮已移除：固定用默认主题（深色），忽略本地存储里可能残留的旧选择
+			const theme = DEFAULT_THEME;
 			switch (theme) {
 				case LIGHT_MODE:
 					document.documentElement.classList.remove('dark');
@@ -134,8 +132,8 @@ const bannerSrc = banner?.startsWith("/") ? url(banner) : banner;
 					}
 			}
 
-			// Load the hue from local storage
-			const hue = localStorage.getItem('hue') || configHue;
+			// Load the hue from local storage（fixed 锁定时忽略旧值，避免残留色相污染配色）
+			const hue = themeColorFixed ? configHue : (localStorage.getItem('hue') || configHue);
 			document.documentElement.style.setProperty('--hue', hue);
 
 			// calculate the --banner-height-extend, which needs to be a multiple of 4 to avoid blurry text
@@ -146,7 +144,67 @@ const bannerSrc = banner?.startsWith("/") ? url(banner) : banner;
 		<style define:vars={{
 			configHue,
 			'page-width': `${PAGE_WIDTH}rem`,
+			'content-width': `${CONTENT_WIDTH}rem`,
 		}}></style>  <!-- defines global css variables. This will be applied to <html> <body> and some other elements idk why -->
+
+		<!-- 点击空白处返回上一页（本站没有返回按钮） -->
+		<script is:inline>
+			(() => {
+				// 用 sessionStorage 记录“站内访问栈”，只在自己站内确实有上一页时才回退，
+				// 否则 history.back() 可能退到浏览器新标签页/空白页
+				const STACK_KEY = '__site_nav_stack__';
+				const readStack = () => {
+					try {
+						const v = JSON.parse(sessionStorage.getItem(STACK_KEY) || '[]');
+						return Array.isArray(v) ? v : [];
+					} catch (_e) {
+						return [];
+					}
+				};
+				const remember = () => {
+					const p = location.pathname + location.search;
+					const s = readStack();
+					const last = s[s.length - 1];
+					if (last === p) return;
+					// 关键：如果新路径 == 栈的倒数第二项，说明是“回退” → 弹栈而不是压栈
+					if (s[s.length - 2] === p) {
+						s.pop();
+					} else {
+						s.push(p);
+					}
+					sessionStorage.setItem(STACK_KEY, JSON.stringify(s));
+				};
+				remember();
+				// swup 切页后补记一笔（新旧事件名都听）
+				document.addEventListener('swup:page:view', remember);
+				document.addEventListener('page:view', remember);
+
+				// 这些区域里的点击算“有内容的点击”，不触发返回
+				const INTERACTIVE = 'a, button, input, textarea, select, label, [role="button"], [role="menuitem"], .card-base, .footer, .custom-md, #navbar, #nav-menu-panel, #light-dark-panel';
+				const isBlank = (el) => {
+					if (!el) return false;
+					if (el === document.body || el === document.documentElement) return true;
+					return !el.closest(INTERACTIVE);
+				};
+
+				document.addEventListener('click', (e) => {
+					if (e.defaultPrevented || e.button !== 0) return;
+					// 首页不做返回（首页没有“上一页”的概念）
+					if (location.pathname === '/' || location.pathname === '') return;
+					if (!isBlank(e.target)) return;
+					// 正在拖选文字时不触发
+					const sel = window.getSelection ? String(window.getSelection()) : '';
+					if (sel.length > 0) return;
+
+					const s = readStack();
+					if (s.length < 2) return; // 站内没有上一页 → 什么都不做
+					// 先确认浏览器历史里确实还有站内页，再回退
+					s.pop();
+					sessionStorage.setItem(STACK_KEY, JSON.stringify(s));
+					window.history.back();
+				});
+			})();
+		</script>
 
 
 		<slot name="head"></slot>

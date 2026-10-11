@@ -30,6 +30,7 @@ export type SiteConfig = {
 			url?: string;
 		};
 	};
+	hero: HeroConfig;
 	toc: {
 		enable: boolean;
 		depth: 1 | 2 | 3;
@@ -40,6 +41,13 @@ export type SiteConfig = {
 	};
 
 	favicon: Favicon[];
+};
+
+export type HeroConfig = {
+	enable: boolean;
+	title?: string;
+	subtitle?: string;
+	description?: string;
 };
 
 export type Favicon = {
@@ -107,11 +115,6 @@ export type BlogPostData = {
 
 export type ExpressiveCodeConfig = {
 	theme: string;
-};
-
-export type WidgetConfig = {
-	umamiShareUrl: string;
-	siteStartTime: string;
 };
 
 export type GiscusConfig = {

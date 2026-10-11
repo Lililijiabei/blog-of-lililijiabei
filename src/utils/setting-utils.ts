@@ -14,6 +14,12 @@ export function getDefaultHue(): number {
 }
 
 export function getHue(): number {
+	// 主题色被 fixed 锁定时忽略 localStorage 里的旧值：
+	// 否则访客以前拖过的色相会一直覆盖配置文件里的色相
+	const configCarrier = document.getElementById("config-carrier");
+	if (configCarrier?.dataset.fixed === "true") {
+		return getDefaultHue();
+	}
 	const stored = localStorage.getItem("hue");
 	return stored ? Number.parseInt(stored, 10) : getDefaultHue();
 }
@@ -57,5 +63,10 @@ export function setTheme(theme: LIGHT_DARK_MODE): void {
 }
 
 export function getStoredTheme(): LIGHT_DARK_MODE {
-	return (localStorage.getItem("theme") as LIGHT_DARK_MODE) || DEFAULT_THEME;
+	// 校验本地存储的值，避免脏数据导致主题图标全部不显示
+	const stored = localStorage.getItem("theme");
+	if (stored === LIGHT_MODE || stored === DARK_MODE || stored === AUTO_MODE) {
+		return stored;
+	}
+	return DEFAULT_THEME;
 }

@@ -146,3 +146,69 @@
     }
   }
 }
+
+
+/* ═══════════ 全站外观：黑紫渐变背景 + 红橙黄紫渐变标题 ═══════════ */
+
+/* 展示文字的渐变：紫罗兰 C4（深紫→亮紫→淡紫）。亮暗两套色阶都校验过对比度 */
+:root {
+    --title-gradient: linear-gradient(
+        100deg,
+        oklch(0.42 0.20 318),
+        oklch(0.48 0.18 302),
+        oklch(0.53 0.14 292)
+    );
+}
+:root.dark {
+    --title-gradient: linear-gradient(
+        100deg,
+        oklch(0.62 0.20 318),
+        oklch(0.78 0.19 300),
+        oklch(0.90 0.08 290)
+    );
+}
+
+/* 页面背景：底色 + 顶部光晕 + 右下角光晕。原来是紫色光晕，按需求改成黑色（= 基本变成纯黑底）。fixed 让它钉在视口而不是随长页面拉伸 */
+:root {
+    background-image:
+        radial-gradient(70rem 42rem at 50% -12%, rgb(0 0 0 / 0.06), transparent 70%),
+        radial-gradient(46rem 32rem at 96% 100%, rgb(0 0 0 / 0.05), transparent 70%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+}
+:root.dark {
+    background-image:
+        radial-gradient(70rem 42rem at 50% -12%, rgb(0 0 0 / 0.6), transparent 70%),
+        radial-gradient(46rem 32rem at 96% 100%, rgb(0 0 0 / 0.4), transparent 70%);
+}
+
+/* 渐变文字工具类：任何标题/markdown 里都能用 class="text-gradient" 复用 */
+.text-gradient {
+    color: var(--primary);
+    /* background-clip:text 时，字形下沉部分（如 j/g/y 的尾巴）若超出绘制盒子会变透明，
+       所以留一点下内边距给下行字 */
+    padding-bottom: 0.1em;
+}
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+    .text-gradient {
+        background-image: var(--title-gradient);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+}
+
+/* 横幅与背景的衔接：顶部压暗让导航文字更稳，底部渐隐进页面底色（消除图片边缘接缝） */
+#banner-wrapper::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: linear-gradient(
+        to bottom,
+        rgb(0 0 0 / 0.55) 0%,
+        rgb(0 0 0 / 0) 26%,
+        rgb(0 0 0 / 0) 55%,
+        var(--page-bg) 100%
+    );
+}

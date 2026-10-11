@@ -1,25 +1,18 @@
 ---
-import Pagination from "../components/control/Pagination.astro";
-import PostPage from "../components/PostPage.astro";
-import { PAGE_SIZE } from "../constants/constants";
+import Hero from "../components/Hero.astro";
 import MainGridLayout from "../layouts/MainGridLayout.astro";
 import { getSortedPosts } from "../utils/content-utils";
+import { getPostUrlBySlug } from "../utils/url-utils";
 
+// 主页不再显示文章列表：文章从左侧链条的圆点直接点进去（老文章走「归档」）
 const allBlogPosts = await getSortedPosts();
-const pageData = allBlogPosts.slice(0, PAGE_SIZE);
-const totalPages = Math.ceil(allBlogPosts.length / PAGE_SIZE);
 
-const page = {
-    data: pageData,
-    currentPage: 1,
-    lastPage: totalPages,
-    url: { current: "/", prev: undefined, next: totalPages > 1 ? "/2/" : undefined },
-};
-
-const len = page.data.length;
+const latestPost = allBlogPosts[0];
+const latestPostUrl = latestPost
+	? getPostUrlBySlug(latestPost.slug)
+	: undefined;
 ---
 
 <MainGridLayout>
-    <PostPage page={page}></PostPage>
-    {totalPages > 1 && <Pagination class="mx-auto onload-animation" page={page} style={`animation-delay: calc(var(--content-delay) + ${(len)*50}ms)`}></Pagination>}
+    <Hero class="onload-animation" style="animation-delay: var(--content-delay)" latestPostUrl={latestPostUrl}></Hero>
 </MainGridLayout>

@@ -33,9 +33,9 @@
 > 本站链接：  
 ```json
 {
-    "title": "wanshushan",
-    "imgurl": "https://blog.wanshushan.top/favicon/icon.png",
-    "desc": "wanshushanの小世界",
+    "title": "Lililijiabei",
+    "imgurl": "https://blog.wanshushan.top/favicon/n2.webp",
+    "desc": "In adversity, life is reborn.",
     "siteurl": "https://blog.wanshushan.top",
     "tags": ["个人博客"]
 }

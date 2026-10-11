@@ -1,0 +1,731 @@
+---
+// 主页装饰：星座式博客图
+//
+// 关键设计：所有线段与圆点都由**同一套顶点模型**驱动（JS 每帧重算顶点坐标，
+// 线段端点与圆点位置共用同一组坐标）→ 天然连成一体、接缝永不散。
+//   · 水平位置：实时取「页面边界 ↔ 内容框边界」的中线（所以用 JS 按视口算）
+//   · 纵向：从页面最底端(y=100)出来，到 y=16 渐隐（覆盖约 84% 高度）
+//   · 第一段最长，其余按 8:11:19 ≈ 2:3:5 的比例长短交替
+//   · 每个顶点各有浮动相位/幅度/频率 → 整条线像活的
+//   · 左侧圆点 = 你的博客（按时间倒序，随页面滚动在链条上滑动：新点从上方进来、往下走）
+//   · 右侧圆点 = 小功能
+//   · 悬停圆点：整条线按高斯衰减柔和让开，线条同步渐细；被悬停的点自己定住不动
+//   · 圆点判定范围比视觉上的点大（26px），边缘不会来回抖
+import { getSortedPosts } from "../utils/content-utils";
+import { getPostUrlBySlug } from "../utils/url-utils";
+
+// 全部文章（getSortedPosts 已按时间倒序）
+const posts = await getSortedPosts();
+
+// x = 相对「边距中线」的偏移（%）；y = 绝对位置（%）
+// 第一段最长（24 / 22），其余长短按 8 : 11 : 19 交替
+const LEFT_PTS: [number, number][] = [
+	[-3, 100],
+	[2, 76],
+	[-4, 68],
+	[4, 57],
+	[-2, 38],
+	[5, 30],
+	[-1, 19],
+	[3, 16],
+];
+const RIGHT_PTS: [number, number][] = [
+	[3, 100],
+	[-2, 78],
+	[4, 59],
+	[-3, 51],
+	[2, 40],
+	[-4, 32],
+	[1, 21],
+	[-2, 16],
+];
+
+const FEATURES: { name: string; en: string; url?: string; external?: boolean }[] = [
+	// 数组顺序 = 从下往上的顺序；en = 悬停气泡里第二行的英文
+	{ name: "主页", en: "Home", url: "/" },
+	{ name: "归档", en: "Archive", url: "/archive/" },
+	{ name: "友链", en: "Friends", url: "/friends/" },
+	{ name: "GitHub", en: "GitHub", url: "https://github.com/Lililijiabei", external: true },
+	// 下两个暂时没有可跳转的页面，先只作纯文本节点（有地址后填上 url 即可）
+	{ name: "QQ", en: "QQ" },
+	{ name: "碎碎念", en: "Murmurs" },
+];
+
+// 左侧链条的槽位：p = -1 ~ 6，正好对应 LEFT_PTS 的下标 p+1。
+// 左侧链条：把 LEFT_PTS 当作一套“锯齿模板”，向上无限重复。
+// 槽位 n = 0 对应模板第 0 点（y=100），n 越大越往上；一个循环占 CYCLE_H%。
+// 每篇文章 = 一个步长（CYCLE_H / 8 = 12%）：滚轮滑动时整条链（线 + 圆点）刚性下移，
+// 圆点永远落在锯齿的转折点上，上方不断有新的线段降下来。
+const CYCLE_H = 96;
+const PAT_N = LEFT_PTS.length; // 8
+const CYCLE_STEP = CYCLE_H / PAT_N; // 12
+const CHAIN_MIN = -2; // 最下面多画 2 格（保证底边永远有线接上来）
+const CHAIN_MAX = 10; // 最上面多画到 +10（保证顶边永远有线降下来）
+const SLOT_COUNT = CHAIN_MAX - CHAIN_MIN + 1; // 13 个锚点 → 12 段线
+const NODE_SLOT0 = 1; // 8 个圆点占槽位 1..8（居中，两端各有多余的段）
+const NODE_COUNT = 8;
+const VISIBLE_SLOTS = 6; // 从头到尾“正式”能看到的点数（用来算最大滑动量）
+
+const modN = (n: number) => ((n % PAT_N) + PAT_N) % PAT_N;
+const chainDx = (n: number) => LEFT_PTS[modN(n)][0];
+const chainY = (n: number) => LEFT_PTS[modN(n)][1] - Math.floor(n / PAT_N) * CYCLE_H;
+
+// 服务端先渲染一套"1600px 视口下大致正确"的坐标，JS 接管后会按真实视口精修
+const DEFAULT_BASE = { L: 11, R: 89 };
+const absX = (side: "L" | "R", dx: number) => DEFAULT_BASE[side] + dx;
+
+const rightNodes = RIGHT_PTS.slice(1, -1);
+const segIndexes = (pts: [number, number][]) => pts.slice(0, -1).map((_, i) => i);
+const fadeAt = (y: number) => Math.max(0.12, Math.min(1, (y - 14) / 26));
+---
+
+<div id="constellation">
+    <svg class="cn-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+            <linearGradient id="cnFade" gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="0" y2="16">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0"></stop>
+                <stop offset="10%" stop-color="#ffffff" stop-opacity="0.45"></stop>
+                <stop offset="50%" stop-color="#ffffff" stop-opacity="0.28"></stop>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
+            </linearGradient>
+            <!-- 左侧链条用和右侧同一份“下亮上淡”的渐变 -->
+        </defs>
+
+        {(["L", "R"] as const).map((side) => {
+            // 左侧是无限重复的锯齿链（每帧由 JS 重算），右侧是固定的 7 段
+            const pts: [number, number][] =
+                side === "L"
+                    ? Array.from({ length: SLOT_COUNT }, (_, a) => [chainDx(CHAIN_MIN + a), 100 - chainY(CHAIN_MIN + a)] as [number, number])
+                    : RIGHT_PTS;
+            return (
+                <g data-side={side}>
+                    {segIndexes(pts).map((i) => (
+                        <line
+                            class="cn-seg"
+                            data-side={side}
+                            data-a={i}
+                            data-b={i + 1}
+                            x1={absX(side, pts[i][0])}
+                            y1={pts[i][1]}
+                            x2={absX(side, pts[i + 1][0])}
+                            y2={pts[i + 1][1]}
+                        ></line>
+                    ))}
+                </g>
+            );
+        })}
+    </svg>
+
+    <!-- 两条线的标注 -->
+    <span class="cn-label" data-label="L">My posts.</span>
+    <span class="cn-label" data-label="R">More.</span>
+
+    <!-- 左侧：博客节点（8 个圆点池，永远是链条的转折点，随滚轮整体上滑，按时间倒序换文章） -->
+    {Array.from({ length: NODE_COUNT }).map((_, j) => {
+        const post = posts[j];
+        const dx = chainDx(NODE_SLOT0 + j);
+        const chainYv = chainY(NODE_SLOT0 + j);
+        const y = 100 - chainYv; // 上下镜像：链条坐标越大 = 越新 → 屏幕上越靠上
+        const hidden = !post || y < -6 || y > 104;
+        return (
+            <a
+                class="cn-node"
+                href={post ? getPostUrlBySlug(post.slug) : undefined}
+                data-side="L"
+                data-vi={j + 1}
+                data-dx={dx}
+                data-tip={dx > 0 ? "right" : "left"}
+                style={`left:${absX("L", dx)}%;top:${y}%;opacity:${hidden ? 0 : fadeAt(y).toFixed(2)}`}
+                aria-label={post ? post.data.title : ""}
+            >
+                <span class="cn-dot"></span>
+                <span class="cn-tip">
+                    <span class="cn-title text-gradient">{post ? post.data.title : ""}</span>
+                    <span class="cn-en">{post ? post.slug : ""}</span>
+                    <span class="cn-tags">{post ? post.data.tags.map((t) => `#${t}`).join("  ") : ""}</span>
+                </span>
+            </a>
+        );
+    })}
+
+    <!-- 右侧：小功能节点（自下而上：主页 / 归档 / 友链 / GitHub / QQ / 碎碎念） -->
+    {rightNodes.map(([dx, y], i) =>
+        FEATURES[i] ? (
+            FEATURES[i].url ? (
+                <a
+                    class="cn-node cn-right"
+                    href={FEATURES[i].url}
+                    target={FEATURES[i].external ? "_blank" : undefined}
+                    rel={FEATURES[i].external ? "noopener noreferrer" : undefined}
+                    data-side="R"
+                    data-vi={i + 1}
+                    data-dx={dx}
+                    data-tip={dx > 0 ? "right" : "left"}
+                    style={`left:${absX("R", dx)}%;top:${y}%;opacity:${fadeAt(y).toFixed(2)}`}
+                    aria-label={FEATURES[i].name}
+                >
+                    <span class="cn-dot"></span>
+                    <span class="cn-tip">
+                        <span class="cn-title text-gradient">{FEATURES[i].name}</span>
+                        <span class="cn-en">{FEATURES[i].en}</span>
+                    </span>
+                </a>
+            ) : (
+                /* 还没有跳转地址：只作为文本节点，不带链接/动作 */
+                <span
+                    class="cn-node cn-text cn-right"
+                    data-side="R"
+                    data-vi={i + 1}
+                    data-dx={dx}
+                    data-tip={dx > 0 ? "right" : "left"}
+                    style={`left:${absX("R", dx)}%;top:${y}%;opacity:${fadeAt(y).toFixed(2)}`}
+                    aria-label={FEATURES[i].name}
+                >
+                    <span class="cn-dot"></span>
+                    <span class="cn-tip">
+                        <span class="cn-title text-gradient">{FEATURES[i].name}</span>
+                        <span class="cn-en">{FEATURES[i].en}</span>
+                    </span>
+                </span>
+            )
+        ) : null,
+    )}
+</div>
+
+<script
+    is:inline
+    define:vars={{
+        BASE_PTS: { L: LEFT_PTS, R: RIGHT_PTS },
+        POSTS: posts.map((p) => ({
+            title: p.data.title,
+            slug: p.slug,
+            url: getPostUrlBySlug(p.slug),
+            tags: p.data.tags,
+        })),
+        VISIBLE_SLOTS,
+        CYCLE_H,
+        PAT_N,
+        CYCLE_STEP,
+        SLOT_COUNT,
+        CHAIN_MIN,
+        NODE_SLOT0,
+        NODE_COUNT,
+        LABEL_SIDE_SHIFT: "-0.5cm",
+    }}
+>
+	(() => {
+		const PULL = 1.2; // 悬停让开的最大距离
+		const SIGMA = 2.2; // 高斯衰减范围
+		const BASE_W = 0.85;
+		const THIN_W = 0.42;
+		const CALM_EASE = 0.12; // 悬停“定住”的缓动
+		const SLIDE_EASE = 0.16; // 链条滑动的缓动
+		const WHEEL_SPAN = 200; // 滚轮多少像素 = 滑一格（一篇）
+		const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		const POST_LIST = POSTS || [];
+		const MAX_OFF = Math.max(0, POST_LIST.length - VISIBLE_SLOTS);
+		const fadeAt = (y) => Math.max(0.12, Math.min(1, (y - 14) / 26));
+
+		// 每个锚点自己的浮动参数（幅度调大了，飘动更明显）
+		const state = {};
+		for (const side of ["L", "R"]) {
+			state[side] = BASE_PTS[side].map(([dx, by], i) => ({
+				dx,
+				by,
+				px: i * 2.1,
+				py: i * 1.7,
+				ax: 1.0 + (i % 3) * 0.6, // 1.0 ~ 2.2 %
+				ay: 1.1 + (i % 4) * 0.5, // 1.1 ~ 2.6 %
+				fx: 0.18 + (i % 3) * 0.05, // 周期约 22~35s
+				fy: 0.2 + (i % 4) * 0.04,
+				phx: 0,
+				phy: 0,
+				calm: 0, // 右侧“悬停定住”程度 0~1
+			}));
+		}
+		// 左侧：浮动参数挂在“模板点”上（8 组），这样链条整体下滑时不会抽筋
+		const LPat = state.L.map((s) => ({ px: s.px, py: s.py, ax: s.ax, ay: s.ay, fx: s.fx, fy: s.fy, phx: 0, phy: 0 }));
+		const patN = (n) => ((n % PAT_N) + PAT_N) % PAT_N;
+		const chainDx = (n) => BASE_PTS.L[patN(n)][0];
+		const chainY = (n) => BASE_PTS.L[patN(n)][1] - Math.floor(n / PAT_N) * CYCLE_H;
+
+		let segs = { L: [], R: [] };
+		let dots = { L: [], R: [] };
+		let dotState = []; // 左侧每个圆点的状态（定住程度 / 当前文章）
+		let hovered = null;
+		let lastHover = null; // 用于缓动退出
+		let pullCur = 0; // 悬停强度（缓动，越小越慢）
+		// 「页面边界 ↔ 内容框边界」的中线，按真实视口算
+		let baseX = { L: 11, R: 89 };
+		let dxScale = 1;
+		let vw = 1600;
+		let lastT = 0; // 上一帧时间（算 dt 用）
+		let off = 0; // 目标滑动偏移（单位 = 篇）
+		let offCur = 0; // 平滑后的偏移
+		let gutterRight = 0; // 左侧滚轮热区的右边界（px）
+		let navSafe = 88; // 顶部导航栏底部（px），热区从它下面开始
+
+		const collect = () => {
+			segs = { L: [], R: [] };
+			dots = { L: [], R: [] };
+			document.querySelectorAll("#constellation .cn-seg").forEach((el) => {
+				segs[el.dataset.side].push(el);
+			});
+			document.querySelectorAll("#constellation .cn-node").forEach((el) => {
+				dots[el.dataset.side].push(el);
+				// 只在“真的离开这个圆点”时才取消悬停状态；
+				// 否则页面上飘过的蝴蝶/光晕触发 mouseover 会把状态提前清掉
+				if (el.dataset.hoverBound) return;
+				el.dataset.hoverBound = "1";
+				el.addEventListener("mouseenter", () => setHover(el.dataset.side, +el.dataset.vi));
+				el.addEventListener("mouseleave", () => setHover(null, 0));
+				el.addEventListener("focus", () => setHover(el.dataset.side, +el.dataset.vi));
+				el.addEventListener("blur", () => setHover(null, 0));
+			});
+			dotState = dots.L.map(() => ({ calm: 0, k: null, tipped: false }));
+		};
+
+		// 气泡的「间距 + 最大宽度」：按圆点到屏幕边缘的剩余空间自适应，保证气泡不出屏
+		// dir = "left"（往左展开，看左边缘）/ "right"（往右展开，看右边缘）
+		const setTipSpace = (el, xPx, dir) => {
+			const edgePx = dir === "right" ? vw - xPx : xPx;
+			const gap = Math.max(12, Math.min(33, edgePx - 56));
+			el.style.setProperty("--cn-tip-gap", `${gap.toFixed(0)}px`);
+			el.style.setProperty("--cn-tip-max", `${Math.max(56, edgePx - gap - 6).toFixed(0)}px`);
+		};
+
+		const updateBase = () => {
+			const raw = getComputedStyle(document.documentElement).getPropertyValue("--content-width").trim();
+			const num = Number.parseFloat(raw) || 55;
+			const contentPx = raw.endsWith("rem") ? num * 16 : num;
+			vw = window.innerWidth || 1;
+			const half = Math.max(0, (vw - contentPx) / 2); // 单侧边距宽度
+			const center = (half / 2 / vw) * 100; // 边距的正中间
+			baseX = { L: center, R: 100 - center };
+			// 左侧空白区（作为滚轮滑链条的热区）的右边界 = 内容框左边缘
+			gutterRight = half;
+			// 顶部导航栏那一横条不算热区，免得在 logo 上滚轮变成滑链条
+			const bar = document.getElementById("navbar");
+			navSafe = bar ? bar.getBoundingClientRect().bottom : 88;
+			// 边距窄的时候把横向锯齿按比例收小，避免跑出屏幕
+			dxScale = Math.min(1, half / 220);
+			// 每个气泡：按该圆点到屏幕边缘的剩余空间，定「间距 + 最大宽度」
+			const cnRoot = document.getElementById("constellation");
+			if (cnRoot) {
+				cnRoot.querySelectorAll(".cn-node[data-side]").forEach((el) => {
+					const side = el.dataset.side;
+					const x = ((side === "L" ? baseX.L : baseX.R) + (+el.dataset.dx) * dxScale) / 100 * vw;
+					setTipSpace(el, x, el.dataset.tip === "right" ? "right" : "left");
+				});
+			}
+			// 标注：左线底部右侧、右线底部左侧（再按 LABEL_SIDE_SHIFT 各自向外侧平移）
+			document.querySelectorAll("#constellation .cn-label").forEach((el) => {
+				if (el.dataset.label === "L") {
+					el.style.left = `calc(${baseX.L + 2.5}% + ${LABEL_SIDE_SHIFT})`;
+					el.style.right = "auto";
+				} else {
+					el.style.right = `calc(${100 - baseX.R + 2.5}% + ${LABEL_SIDE_SHIFT})`;
+					el.style.left = "auto";
+				}
+			});
+		};
+
+		// 鼠标在「昵称卡左侧那片空白」滚轮 → 链条上下滑动（页面不跟着滚）
+		const inLeftGutter = (x, y) => x >= 0 && y >= navSafe && x < gutterRight;
+		const onWheel = (e) => {
+			if (MAX_OFF <= 0 || e.ctrlKey || e.metaKey) return;
+			if (!inLeftGutter(e.clientX, e.clientY)) return;
+			e.preventDefault();
+			const unit = e.deltaMode === 1 ? 24 : e.deltaMode === 2 ? 480 : 1; // 行 / 页
+			off = Math.max(0, Math.min(MAX_OFF, off + (e.deltaY * unit) / WHEEL_SPAN));
+		};
+
+		// 换文章时才动 DOM（滑动过程中每帧都会调用）
+		const syncDot = (d, item) => {
+			if (d.k === item.k) return;
+			d.k = item.k;
+			const post = item.post;
+			item.dot.setAttribute("href", post.url);
+			item.dot.setAttribute("aria-label", post.title);
+			const tip = item.dot.querySelector(".cn-tip");
+			tip.querySelector(".cn-title").textContent = post.title;
+			tip.querySelector(".cn-en").textContent = post.slug;
+			tip.querySelector(".cn-tags").textContent = (post.tags || []).map((t) => `#${t}`).join("  ");
+		};
+
+		const drawSegments = (side, pos, weight) => {
+			for (const seg of segs[side]) {
+				const a = +seg.dataset.a;
+				const b = +seg.dataset.b;
+				seg.setAttribute("x1", pos[a][0]);
+				seg.setAttribute("y1", pos[a][1]);
+				seg.setAttribute("x2", pos[b][0]);
+				seg.setAttribute("y2", pos[b][1]);
+				const k = Math.max(weight[a], weight[b]);
+				seg.style.strokeWidth = (BASE_W - (BASE_W - THIN_W) * k).toFixed(2);
+			}
+		};
+
+		const draw = (now) => {
+			const t = now / 1000;
+			// 相位用 dt 累加，切标签页/卡顿回来时不会瞬移
+			const dt = lastT ? Math.min(0.1, t - lastT) : 0;
+			lastT = t;
+			// 悬停强度缓动：数值越小，线条让开/回位越慢越柔和
+			pullCur += ((hovered ? 1 : 0) - pullCur) * 0.04;
+			// 滚动滑动缓动
+			offCur += (off - offCur) * SLIDE_EASE;
+			if (Math.abs(off - offCur) < 0.0006) offCur = off;
+			const h = hovered || lastHover;
+
+			// ---------- 右侧：锚点就是圆点 ----------
+			{
+				const vs = state.R;
+				if (segs.R.length) {
+					const pos = vs.map((v, vi) => {
+						// 鼠标停着的那一个点：完全定住（幅度归零、相位不再前进）
+						const calmTarget = hovered && hovered.side === "R" && hovered.vi === vi ? 1 : 0;
+						v.calm += (calmTarget - v.calm) * CALM_EASE;
+						const slow = 1 - v.calm;
+						v.phx += dt * v.fx * slow;
+						v.phy += dt * v.fy * slow;
+						const amp = 1 - v.calm;
+						return [
+							baseX.R + v.dx * dxScale + Math.sin(v.phx + v.px) * v.ax * amp,
+							v.by + Math.cos(v.phy + v.py) * v.ay * amp,
+						];
+					});
+					const weight = new Array(pos.length).fill(0);
+					if (h && pullCur > 0.01 && h.side === "R") {
+						const i = h.vi;
+						const hx = pos[i][0];
+						const hy = pos[i][1];
+						for (let j = 0; j < pos.length; j++) {
+							const d = Math.abs(j - i);
+							if (d === 0) continue;
+							const k = Math.exp(-(d * d) / (2 * SIGMA * SIGMA)) * pullCur;
+							if (k < 0.03) continue;
+							weight[j] = k;
+							const ddx = pos[j][0] - hx;
+							const ddy = pos[j][1] - hy;
+							const len = Math.hypot(ddx, ddy) || 1;
+							pos[j] = [pos[j][0] + (ddx / len) * PULL * k, pos[j][1] + (ddy / len) * PULL * k];
+						}
+					}
+					drawSegments("R", pos, weight);
+					for (const dot of dots.R) {
+						const vi = +dot.dataset.vi;
+						dot.style.left = pos[vi][0] + "%";
+						dot.style.top = pos[vi][1] + "%";
+					}
+				}
+			}
+
+			// ---------- 左侧：整条锯齿链（线 + 圆点）刚性下滑 ----------
+			{
+				for (const s of LPat) {
+					s.phx += dt * s.fx;
+					s.phy += dt * s.fy;
+				}
+				const wobble = (n) => {
+					const s = LPat[patN(n)];
+					return [Math.sin(s.phx + s.px) * s.ax, Math.cos(s.phy + s.py) * s.ay];
+				};
+
+				// slot a = first + CHAIN_MIN + a；整条链再向下平移 offCur 个步长
+				const first = Math.floor(offCur);
+				const slide = offCur * CYCLE_STEP;
+				const dotOffset = NODE_SLOT0 - CHAIN_MIN; // pos 数组里第一个圆点的下标
+				// 先更新“定住”程度：与右侧完全同一套逻辑（鼠标停着的点浮动归零、定在转折点上）
+				for (let j = 0; j < dots.L.length; j++) {
+					const st = dotState[j] || (dotState[j] = { calm: 0, k: null });
+					const isHov = hovered && hovered.side === "L" && hovered.vi === j + 1;
+					st.calm += ((isHov ? 1 : 0) - st.calm) * CALM_EASE;
+				}
+				const pos = [];
+				for (let a = 0; a < SLOT_COUNT; a++) {
+					const n = first + CHAIN_MIN + a;
+					const [wx, wy] = wobble(n);
+					// 被悬停的那个槽位把浮动收掉（线也跟着收，圆点就稳稳停在转折点上）
+					const st = dotState[a - dotOffset];
+					const damp = st ? 1 - st.calm : 1;
+					// 链条坐标（越大 = 越新）→ 屏幕坐标做上下镜像，所以整体往上滑
+					const cy = chainY(n) + slide + wy * damp;
+					pos.push([baseX.L + chainDx(n) * dxScale + wx * damp, 100 - cy]);
+				}
+
+				const weight = new Array(pos.length).fill(0);
+				if (h && pullCur > 0.01 && h.side === "L") {
+					// 悬停点的锚点下标 = 圆点编号换算到 pos 数组里的下标
+					const pivot = h.vi + (NODE_SLOT0 - CHAIN_MIN - 1);
+					const base = pos[pivot];
+					for (let i = 0; i < pos.length; i++) {
+						const d = Math.abs(i - pivot);
+						if (d === 0) continue;
+						const k = Math.exp(-(d * d) / (2 * SIGMA * SIGMA)) * pullCur;
+						if (k < 0.03) continue;
+						weight[i] = k;
+						const ddx = pos[i][0] - base[0];
+						const ddy = pos[i][1] - base[1];
+						const len = Math.hypot(ddx, ddy) || 1;
+						pos[i] = [pos[i][0] + (ddx / len) * PULL * k, pos[i][1] + (ddy / len) * PULL * k];
+					}
+				}
+				drawSegments("L", pos, weight);
+
+				// 8 个圆点坐在槽位 1..8 的转折点上，第 j 个 = 第 floor(offCur)+j 篇
+				for (let j = 0; j < dots.L.length; j++) {
+					const item = { dot: dots.L[j], k: first + j, post: POST_LIST[first + j] };
+					const st = dotState[j] || (dotState[j] = { calm: 0, k: null });
+					const xy = pos[j + dotOffset];
+					if (!item.post || xy[1] < -6 || xy[1] > 104) {
+						item.dot.style.visibility = "hidden";
+						st.calm = 0;
+						continue;
+					}
+					item.dot.style.visibility = "";
+					syncDot(st, item);
+					// 气泡往“圆点相对线条偏移的那一侧”展开（与左侧/右侧线条无关）
+					const dir = chainDx(first + NODE_SLOT0 + j) > 0 ? "right" : "left";
+					if (item.dot.dataset.tip !== dir) item.dot.dataset.tip = dir;
+					// 悬停时气泡间距/宽度按当前位置到屏幕边缘的剩余空间算（只算一次）
+					if (st.calm > 0.5 && !st.tipped) {
+						st.tipped = true;
+						setTipSpace(item.dot, (xy[0] / 100) * vw, dir);
+					}
+					if (st.calm === 0) st.tipped = false;
+					item.dot.style.left = xy[0] + "%";
+					item.dot.style.top = xy[1] + "%";
+					item.dot.style.opacity = fadeAt(xy[1]).toFixed(2);
+				}
+			}
+		};
+
+		const setHover = (side, vi) => {
+			hovered = side ? { side, vi } : null;
+			if (side) lastHover = { side, vi };
+		};
+
+		window.addEventListener("resize", updateBase);
+		window.addEventListener("wheel", onWheel, { passive: false });
+
+		collect();
+		updateBase();
+		document.addEventListener("swup:page:view", () => {
+			collect();
+			updateBase();
+			if (reduce) draw(0);
+		});
+		document.addEventListener("page:view", collect);
+		if (reduce) {
+			draw(0); // 静止模式下也摆一次正确位置
+		} else {
+			const loop = (now) => {
+				draw(now);
+				requestAnimationFrame(loop);
+			};
+			requestAnimationFrame(loop);
+		}
+	})();
+</script>
+
+<style>
+    #constellation {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        overflow: hidden;
+        pointer-events: none;
+    }
+    .cn-lines {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+    }
+    .cn-seg {
+        stroke: url(#cnFade);
+        stroke-width: 0.85;
+        stroke-linecap: round;
+        vector-effect: non-scaling-stroke;
+        filter: drop-shadow(0 0 4px rgb(255 255 255 / 0.75)) drop-shadow(0 0 12px oklch(0.62 0.2 318 / 0.55));
+    }
+    /* 左侧链条与右侧用同一份渐变：下面实、上面淡 */
+
+    /* 判定范围比视觉上的点大一圈（26px），鼠标在边缘也不会一直进出判定 */
+    .cn-node {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        margin: -13px 0 0 -13px;
+        padding: 0;
+        border: 0;
+        background: none;
+        pointer-events: auto;
+    }
+    /* 暂无跳转的纯文本节点 */
+    .cn-text {
+        cursor: default;
+    }
+    .cn-dot {
+        display: block;
+        width: 7px;
+        height: 7px;
+        border-radius: 9999px;
+        background: #fff;
+        box-shadow:
+            0 0 5px 1.5px rgb(255 255 255 / 0.7),
+            0 0 13px 5px oklch(0.62 0.2 318 / 0.45);
+        transition:
+            transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1),
+            box-shadow 0.3s;
+    }
+    .cn-node:hover .cn-dot,
+    .cn-node:focus-visible .cn-dot {
+        transform: scale(1.8);
+        box-shadow:
+            0 0 7px 2.5px rgb(255 255 255 / 0.85),
+            0 0 20px 9px oklch(0.62 0.2 318 / 0.55);
+    }
+
+    .cn-tip {
+        position: absolute;
+        top: 50%;
+        display: flex;
+        flex-direction: column;
+        /* 默认：往左（屏幕外侧）展开 */
+        right: var(--cn-tip-gap, 33px);
+        align-items: flex-end;
+        text-align: right;
+        gap: 0.15rem;
+        /* 宽度按该圆点到屏幕边缘的剩余空间算（JS 写入 --cn-tip-max），超了就换行 */
+        max-width: var(--cn-tip-max, 12rem);
+        overflow-wrap: break-word;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-50%) scale(0.94);
+        transform-origin: right center;
+        transition:
+            opacity 0.2s ease,
+            transform 0.2s ease;
+    }
+    /* 圆点在线条中心轴的右边 → 气泡往右展开（左边同理） */
+    .cn-node[data-tip="right"] .cn-tip {
+        right: auto;
+        left: var(--cn-tip-gap, 33px);
+        align-items: flex-start;
+        text-align: left;
+        transform-origin: left center;
+    }
+    .cn-node:hover .cn-tip,
+    .cn-node:focus-visible .cn-tip {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+    /* 第一行：与首页大昵称同一套渐变字体，字号与下面英文一致 */
+    .cn-title {
+        font-size: 0.8rem;
+        font-weight: 700;
+        line-height: 1.35;
+    }
+    .cn-tags {
+        font-size: 0.75rem;
+        color: var(--primary);
+    }
+    .cn-tags:empty {
+        display: none;
+    }
+
+    /* 底部两个短语 & 气泡里的英文：同一套字体 + 外发光 */
+    .cn-label,
+    .cn-en {
+        font-size: 0.8rem;
+        letter-spacing: 0.06em;
+        color: rgb(255 255 255 / 0.88);
+        text-shadow:
+            0 0 6px rgb(255 255 255 / 0.4),
+            0 0 14px oklch(0.62 0.2 318 / 0.3);
+        white-space: nowrap;
+    }
+
+    /* 线条底部的标注（位置由 JS 按边距中线设置） */
+    .cn-label {
+        position: absolute;
+        /* 原本是 91%，这里整体再下移 1cm */
+        top: calc(91% + 1cm);
+        pointer-events: none;
+        will-change: transform;
+    }
+
+    /* 只有底部两个短语带轻微浮动；气泡里的中英文都不浮动 */
+    @media (prefers-reduced-motion: no-preference) {
+        .cn-label {
+            animation:
+                cn-label-twinkle 3.6s ease-in-out infinite,
+                cn-label-float 8.5s ease-in-out infinite;
+        }
+        .cn-label[data-label="R"] {
+            animation-delay: -1.5s, -3.2s;
+        }
+        .cn-en {
+            animation: cn-label-twinkle 3.6s ease-in-out infinite;
+        }
+        .cn-right .cn-en {
+            animation-delay: -1.5s;
+        }
+    }
+    @keyframes cn-label-twinkle {
+        0%,
+        100% {
+            text-shadow:
+                0 0 6px rgb(255 255 255 / 0.35),
+                0 0 13px oklch(0.62 0.2 318 / 0.22);
+        }
+        16% {
+            text-shadow:
+                0 0 9px rgb(255 255 255 / 0.95),
+                0 0 24px oklch(0.68 0.22 318 / 0.8);
+        }
+        31% {
+            text-shadow:
+                0 0 6px rgb(255 255 255 / 0.45),
+                0 0 15px oklch(0.62 0.2 318 / 0.28);
+        }
+        52% {
+            text-shadow:
+                0 0 10px rgb(255 255 255 / 0.85),
+                0 0 22px oklch(0.66 0.21 318 / 0.65);
+        }
+        68% {
+            text-shadow:
+                0 0 5px rgb(255 255 255 / 0.4),
+                0 0 12px oklch(0.62 0.2 318 / 0.25);
+        }
+    }
+    @keyframes cn-label-float {
+        0%,
+        100% {
+            transform: translate3d(0, 0, 0);
+        }
+        30% {
+            transform: translate3d(-1.6px, -3px, 0);
+        }
+        60% {
+            transform: translate3d(1.6px, -5px, 0);
+        }
+    }
+
+    @media (max-width: 1023px) {
+        #constellation {
+            display: none;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .cn-dot,
+        .cn-tip {
+            transition: none;
+        }
+    }
+</style>
