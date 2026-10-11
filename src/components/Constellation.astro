@@ -46,8 +46,12 @@ const FEATURES: { name: string; en: string; url?: string; external?: boolean }[]
 	{ name: "归档", en: "Archive", url: "/archive/" },
 	{ name: "友链", en: "Friends", url: "/friends/" },
 	{ name: "GitHub", en: "GitHub", url: "https://github.com/Lililijiabei", external: true },
-	// 下两个暂时没有可跳转的页面，先只作纯文本节点（有地址后填上 url 即可）
-	{ name: "QQ", en: "QQ" },
+	// QQ：✓ 已填上你的分享码（会自动在新标签页打开）；下面是换写法时的参考：
+	//   { name: "QQ", en: "QQ", url: "https://wpa.qq.com/msgrd?v=3&uin=你的QQ号&site=qq&menu=yes", external: true }
+	//   { name: "QQ", en: "QQ", url: "https://qm.qq.com/q/你的分享码", external: true }
+	//   { name: "QQ", en: "QQ", url: "mqqwpa://im/chat?chat_type=wpa&uin=你的QQ号", external: true }  （仅手机端）
+	// 碎碎念：以后有页面了把 url 填上就变成可点链接
+	{ name: "QQ", en: "QQ", url: "https://qm.qq.com/q/fipq0vmhcQ", external: true },
 	{ name: "碎碎念", en: "Murmurs" },
 ];
 
