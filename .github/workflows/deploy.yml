@@ -1,61 +1,57 @@
-# name: Deploy to GitHub Pages
-# on:
-#   push:
-#     branches: [ main ]
-# permissions:
-#     contents: write
-# jobs:
-#   build-and-deploy:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v4
-#       - name: Use Node.js
-#         uses: actions/setup-node@v4
-#         with:
-#           node-version: '20'
-#       - run: npm install -g pnpm
-#       - run: pnpm install
-#       - run: pnpm build
-#       - name: Deploy
-#         uses: peaceiris/actions-gh-pages@v3
-#         with:
-#           github_token: ${{ secrets.GITHUB_TOKEN }}
-#           publish_dir: ./dist
-
-
-
-
+# 推送到 main 时自动构建并发布到 GitHub Pages
 name: Deploy to GitHub Pages
 
 on:
-  # 每次推送到 `main` 分支时触发这个“工作流程”
-  # 如果你使用了别的分支名，请按需将 `main` 替换成你的分支名
   push:
     branches: [ main ]
-  # 允许你在 GitHub 上的 Actions 标签中手动触发此“工作流程”
+  # 也可以在 GitHub 上手动触发
   workflow_dispatch:
 
-# 允许 job 克隆 repo 并创建一个 page deployment
+# 允许工作流克隆仓库、开启/写入 Pages、以及用 OIDC 发布
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# 同一时间只跑一个发布任务
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout your repository using git
-        uses: actions/checkout@v5
-      - name: Install, build, and upload your site
-        uses: withastro/action@v5
-        # with:
-        #   path: .wanshushan-blog # 存储库中 Astro 项目的根位置。（可选）
-        #   node-version: 22 # 用于构建站点的特定 Node.js 版本，默认为 20。（可选）
-        #   package-manager: pnpm@latest # 应使用哪个 Node.js 包管理器来安装依赖项和构建站点。会根据存储库中的 lockfile 自动检测。（可选）
-        #   build-cmd: pnpm run build # 用于构建你的网站的命令。默认运行软件包的构建脚本或任务。（可选）
-        # env:
-        #   PUBLIC_POKEAPI: 'https://pokeapi.co/api/v2' # 对变量值使用单引号。（可选）
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build
+        run: pnpm build
+
+      # enablement: true → 仓库还没开启 Pages 时自动开启（之前部署失败就是因为没开）
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
 
   deploy:
     needs: build
