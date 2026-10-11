@@ -52,7 +52,8 @@ const FEATURES: { name: string; en: string; url?: string; external?: boolean }[]
 	//   { name: "QQ", en: "QQ", url: "mqqwpa://im/chat?chat_type=wpa&uin=你的QQ号", external: true }  （仅手机端）
 	// 碎碎念：以后有页面了把 url 填上就变成可点链接
 	{ name: "QQ", en: "QQ", url: "https://qm.qq.com/q/fipq0vmhcQ", external: true },
-	{ name: "碎碎念", en: "Murmurs" },
+	// 碎碎念：内容写在 src/content/spec/murmurs.md
+	{ name: "碎碎念", en: "Murmurs", url: "/murmurs/" },
 ];
 
 // 左侧链条的槽位：p = -1 ~ 6，正好对应 LEFT_PTS 的下标 p+1。
