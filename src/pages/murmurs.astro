@@ -16,9 +16,18 @@ const { Content } = await render(murmurs);
 <MainGridLayout title="碎碎念" description="碎碎念 - 一些不成篇的小想法与日常记录">
     <div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32">
         <div class="card-base z-10 px-9 py-6 relative w-full ">
-            <Markdown class="mt-2">
-                <Content />
-            </Markdown>
+            <div class="murmurs-content">
+                <Markdown class="mt-2">
+                    <Content />
+                </Markdown>
+            </div>
         </div>
     </div>
 </MainGridLayout>
+
+<style>
+    /* 碎碎念里“一行就是一行”：单个回车也换行（markdown 默认会把软换行折叠掉） */
+    .murmurs-content :global(p) {
+        white-space: pre-line;
+    }
+</style>
