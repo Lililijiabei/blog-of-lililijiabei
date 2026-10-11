@@ -1,0 +1,70 @@
+{
+	"friends": [
+		{
+			"title": "Wer Blog",
+			"imgurl": " https://blog.isyyo.com/favicon/logo.png",
+			"desc": "The only way to do great is to love what you do.|邮箱: i@hiwer.cn",
+			"siteurl": "https://blog.isyyo.com/",
+			"tags": ["框架"]
+		},
+		{
+			"title": "AULyPcのBlog",
+			"imgurl": "https://blog.aulypc0x0.online/favicon/favicon_amiya.webp",
+			"desc": "今日も生きててえらい ☁",
+			"siteurl": "https://blog.aulypc0x0.online/",
+			"tags": ["个人博客"]
+		},
+		{
+			"title": "藤君的小窝",
+			"imgurl": "https://blog.stivine.fun/favicon/avatar.jpg",
+			"desc": "温馨暖暖的角落",
+			"siteurl": "https://blog.stivine.fun/",
+			"tags": ["个人博客"]
+		},
+		{
+			"title": "wanshushan",
+			"imgurl": "https://blog.wanshushan.top/favicon/icon.png",
+			"desc": "wanshushanの小世界",
+			"siteurl": "https://blog.wanshushan.top",
+			"tags": ["个人博客"]
+		},
+		{
+			"title": "THW’s Blog",
+			"imgurl": "https://image.tianhw.top/avatar.webp",
+			"desc": "前途似海，来日方长",
+			"siteurl": "https://blog.tianhw.top",
+			"tags": ["个人博客"]
+		},
+		{
+			"title": "qif711的博客",
+			"imgurl": "https://q1.qlogo.cn/g?b=qq&nk=3258266043&s=640",
+			"desc": "记住笑着跑完 看半路就放弃的那些都是脑残",
+			"siteurl": "https://www.cnblogs.com/qif711",
+			"tags": ["个人博客"]
+		},
+		{
+			"title": "HNFHNF",
+			"imgurl": "https://q2.qlogo.cn/g?b=qq&nk=3037886495&s=640",
+			"desc": "Acmer",
+			"siteurl": "http://acm.i00.icu/",
+			"tags": ["个人博客"]
+		},
+		{
+			"title": "leocodex",
+			"imgurl": "https://q2.qlogo.cn/g?b=qq&nk=975287928&s=640",
+			"desc": "恰逢春日,你笑一语,风暖一句",
+			"siteurl": "https://blog.nowcoder.net/leocodex",
+			"tags": ["个人博客"]
+		}
+
+	],
+	"示例：": [
+		{
+			"title": "示例友链",
+			"imgurl": "https://example.com/favicon.ico这是图标链接",
+			"desc": "这是一个示例友链的描述。显示内容应当填写在friends数组中",
+			"siteurl": "https://example.com/这是网站链接",
+			"tags": ["示例", "测试"]
+		}
+	]
+}
