@@ -29,3 +29,6 @@ yarn.lock
 # ide
 .idea
 *.iml
+
+# 本地原始音乐文件（网站使用 public/music/ 下的副本）
+music/

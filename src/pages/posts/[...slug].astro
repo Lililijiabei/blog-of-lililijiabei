@@ -12,6 +12,8 @@ import { getDir, getPostUrlBySlug } from "@utils/url-utils";
 import { Icon } from "astro-icon/components";
 // 引入评论组件
 import Giscus from "../../components/misc/Giscus.astro";
+// 引入背景音乐组件
+import BGM from "../../components/BGM.svelte";
 import ImageWrapper from "../../components/misc/ImageWrapper.astro";
 import PostMetadata from "../../components/PostMeta.astro";
 import { giscusConfig, licenseConfig, profileConfig, siteConfig } from "../../config";
@@ -70,6 +72,7 @@ const jsonLd = {
                         {remarkPluginFrontmatter.minutes} {" " + i18n(remarkPluginFrontmatter.minutes === 1 ? I18nKey.minuteCount : I18nKey.minutesCount)}
                     </div>
                 </div>
+                {entry.data.audio && <BGM src={entry.data.audio} title={entry.data.audioTitle} client:load />}
             </div>
 
             <!-- title -->

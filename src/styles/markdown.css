@@ -103,11 +103,15 @@
     }
 
     blockquote {
-        @apply not-italic border-transparent relative;
+        @apply not-italic border-transparent relative my-6;
         font-weight: inherit;
+        padding: 1rem 1.25rem 1rem 1.5rem;
+        border-radius: var(--radius-large);
+        background: var(--license-block-bg);
 
         &:before {
-            @apply content-[''] absolute -left-1 block transition bg-[var(--btn-regular-bg)] h-full w-1 rounded-full;
+            @apply content-[''] absolute left-2 top-3 bottom-3 w-1 rounded-full;
+            background-image: var(--title-gradient);
         }
 
         /* Remove the double quotes from default styles */
@@ -125,6 +129,39 @@
 
     .raw-image {
         @apply rounded-xl my-2 max-w-full h-auto;
+    }
+
+    /* 正文中文排版优化 */
+    p {
+        line-height: 1.9;
+        letter-spacing: 0.01em;
+    }
+
+    /* 标题装饰：h2/h3 左侧渐变竖条（呼应文章主标题） */
+    h2, h3 {
+        position: relative;
+        padding-left: 1rem;
+    }
+    h2::before, h3::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0.3em;
+        bottom: 0.3em;
+        width: 4px;
+        border-radius: 2px;
+        background-image: var(--title-gradient);
+    }
+
+    /* 滚动入场动画：进入视口时淡入上浮（JS 添加 .reveal / .revealed） */
+    .reveal {
+        opacity: 0;
+        transform: translateY(1rem);
+        transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .reveal.revealed {
+        opacity: 1;
+        transform: none;
     }
     
 }

@@ -13,6 +13,12 @@ const postsCollection = defineCollection({
 		category: z.string().optional().nullable().default(""),
 		lang: z.string().optional().default(""),
 
+		/* 背景音乐：音频文件地址（本地放 public/ 下，如 /audio/bgm.mp3，也支持网络直链） */
+		audio: z.string().optional().default(""),
+
+		/* 背景音乐名称（显示在播放按钮旁） */
+		audioTitle: z.string().optional().default(""),
+
 		/* For internal use */
 		prevTitle: z.string().default(""),
 		prevSlug: z.string().default(""),
