@@ -82,6 +82,12 @@ const absX = (side: "L" | "R", dx: number) => DEFAULT_BASE[side] + dx;
 const rightNodes = RIGHT_PTS.slice(1, -1);
 const segIndexes = (pts: [number, number][]) => pts.slice(0, -1).map((_, i) => i);
 const fadeAt = (y: number) => Math.max(0.12, Math.min(1, (y - 14) / 26));
+const formatDate = (d: Date) => {
+	const yy = String(d.getFullYear()).slice(-2);
+	const mm = String(d.getMonth() + 1).padStart(2, "0");
+	const dd = String(d.getDate()).padStart(2, "0");
+	return `${yy}/${mm}/${dd}`;
+};
 ---
 
 <div id="constellation">
@@ -125,16 +131,17 @@ const fadeAt = (y: number) => Math.max(0.12, Math.min(1, (y - 14) / 26));
     <span class="cn-label" data-label="L">My posts.</span>
     <span class="cn-label" data-label="R">More.</span>
 
-    <!-- 左侧：博客节点（8 个圆点池，永远是链条的转折点，随滚轮整体上滑，按时间倒序换文章） -->
+    <!-- 左侧：博客节点（8 个圆点池，最新一篇在最下面，越旧越往上） -->
     {Array.from({ length: NODE_COUNT }).map((_, j) => {
-        const post = posts[j];
+        const post = posts[NODE_COUNT - 1 - j];
         const dx = chainDx(NODE_SLOT0 + j);
         const chainYv = chainY(NODE_SLOT0 + j);
         const y = 100 - chainYv; // 上下镜像：链条坐标越大 = 越新 → 屏幕上越靠上
         const hidden = !post || y < -6 || y > 104;
+        const isLatest = post && posts.length > 0 && post.slug === posts[0].slug;
         return (
             <a
-                class="cn-node"
+                class:list={["cn-node", { "cn-latest": isLatest }]}
                 href={post ? getPostUrlBySlug(post.slug) : undefined}
                 data-side="L"
                 data-vi={j + 1}
@@ -146,8 +153,7 @@ const fadeAt = (y: number) => Math.max(0.12, Math.min(1, (y - 14) / 26));
                 <span class="cn-dot"></span>
                 <span class="cn-tip">
                     <span class="cn-title text-gradient">{post ? post.data.title : ""}</span>
-                    <span class="cn-en">{post ? post.slug : ""}</span>
-                    <span class="cn-tags">{post ? post.data.tags.map((t) => `#${t}`).join("  ") : ""}</span>
+                    <span class="cn-meta">{post ? formatDate(post.data.published) + (post.data.tags.length ? "·" + post.data.tags.join("·") : "") : ""}</span>
                 </span>
             </a>
         );
@@ -206,6 +212,7 @@ const fadeAt = (y: number) => Math.max(0.12, Math.min(1, (y - 14) / 26));
             slug: p.slug,
             url: getPostUrlBySlug(p.slug),
             tags: p.data.tags,
+            date: formatDate(p.data.published),
         })),
         VISIBLE_SLOTS,
         CYCLE_H,
@@ -354,8 +361,10 @@ const fadeAt = (y: number) => Math.max(0.12, Math.min(1, (y - 14) / 26));
 			item.dot.setAttribute("aria-label", post.title);
 			const tip = item.dot.querySelector(".cn-tip");
 			tip.querySelector(".cn-title").textContent = post.title;
-			tip.querySelector(".cn-en").textContent = post.slug;
-			tip.querySelector(".cn-tags").textContent = (post.tags || []).map((t) => `#${t}`).join("  ");
+			const meta = [post.date, ...(post.tags || [])].filter(Boolean).join("·");
+			tip.querySelector(".cn-meta").textContent = meta;
+			// 最新一篇的圆点透紫光
+			item.dot.classList.toggle("cn-latest", post.slug === POST_LIST[0]?.slug);
 		};
 
 		const drawSegments = (side, pos, weight) => {
@@ -480,7 +489,7 @@ const fadeAt = (y: number) => Math.max(0.12, Math.min(1, (y - 14) / 26));
 
 				// 8 个圆点坐在槽位 1..8 的转折点上，第 j 个 = 第 floor(offCur)+j 篇
 				for (let j = 0; j < dots.L.length; j++) {
-					const item = { dot: dots.L[j], k: first + j, post: POST_LIST[first + j] };
+					const item = { dot: dots.L[j], k: first + j, post: POST_LIST[first + (NODE_COUNT - 1 - j)] };
 					const st = dotState[j] || (dotState[j] = { calm: 0, k: null });
 					const xy = pos[j + dotOffset];
 					if (!item.post || xy[1] < -6 || xy[1] > 104) {
@@ -594,6 +603,20 @@ const fadeAt = (y: number) => Math.max(0.12, Math.min(1, (y - 14) / 26));
             0 0 7px 2.5px rgb(255 255 255 / 0.85),
             0 0 20px 9px oklch(0.62 0.2 318 / 0.55);
     }
+    /* 最新一篇的圆点：更浓的紫光 */
+    .cn-node.cn-latest .cn-dot {
+        box-shadow:
+            0 0 6px 2px rgb(255 255 255 / 0.75),
+            0 0 16px 7px oklch(0.68 0.24 300 / 0.85),
+            0 0 30px 14px oklch(0.6 0.25 300 / 0.5);
+    }
+    .cn-node.cn-latest:hover .cn-dot,
+    .cn-node.cn-latest:focus-visible .cn-dot {
+        box-shadow:
+            0 0 8px 3px rgb(255 255 255 / 0.9),
+            0 0 22px 10px oklch(0.7 0.26 300 / 0.95),
+            0 0 38px 18px oklch(0.62 0.26 300 / 0.6);
+    }
 
     .cn-tip {
         position: absolute;
@@ -634,12 +657,14 @@ const fadeAt = (y: number) => Math.max(0.12, Math.min(1, (y - 14) / 26));
         font-size: 0.8rem;
         font-weight: 700;
         line-height: 1.35;
+        white-space: nowrap;
     }
-    .cn-tags {
+    .cn-meta {
         font-size: 0.75rem;
         color: var(--primary);
+        white-space: nowrap;
     }
-    .cn-tags:empty {
+    .cn-meta:empty {
         display: none;
     }
 
