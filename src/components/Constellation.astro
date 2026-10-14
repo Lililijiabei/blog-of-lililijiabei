@@ -131,9 +131,9 @@ const formatDate = (d: Date) => {
     <span class="cn-label" data-label="L">My posts.</span>
     <span class="cn-label" data-label="R">More.</span>
 
-    <!-- 左侧：博客节点（8 个圆点池，最新一篇在最下面，越旧越往上） -->
+    <!-- 左侧：博客节点（8 个圆点池，最旧一篇在最下面，越新越往上） -->
     {Array.from({ length: NODE_COUNT }).map((_, j) => {
-        const post = posts[NODE_COUNT - 1 - j];
+        const post = posts[j];
         const dx = chainDx(NODE_SLOT0 + j);
         const chainYv = chainY(NODE_SLOT0 + j);
         const y = 100 - chainYv; // 上下镜像：链条坐标越大 = 越新 → 屏幕上越靠上
@@ -489,7 +489,7 @@ const formatDate = (d: Date) => {
 
 				// 8 个圆点坐在槽位 1..8 的转折点上，第 j 个 = 第 floor(offCur)+j 篇
 				for (let j = 0; j < dots.L.length; j++) {
-					const item = { dot: dots.L[j], k: first + j, post: POST_LIST[first + (NODE_COUNT - 1 - j)] };
+					const item = { dot: dots.L[j], k: first + j, post: POST_LIST[first + j] };
 					const st = dotState[j] || (dotState[j] = { calm: 0, k: null });
 					const xy = pos[j + dotOffset];
 					if (!item.post || xy[1] < -6 || xy[1] > 104) {
