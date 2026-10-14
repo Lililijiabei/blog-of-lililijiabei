@@ -659,18 +659,14 @@ const formatDate = (d: Date) => {
         line-height: 1.35;
         white-space: nowrap;
     }
-    .cn-meta {
-        font-size: 0.75rem;
-        color: #fff;
-        white-space: nowrap;
-    }
     .cn-meta:empty {
         display: none;
     }
 
     /* 底部两个短语 & 气泡里的英文：同一套字体 + 外发光 */
     .cn-label,
-    .cn-en {
+    .cn-en,
+    .cn-meta {
         font-size: 0.8rem;
         letter-spacing: 0.06em;
         color: rgb(255 255 255 / 0.88);
@@ -699,7 +695,8 @@ const formatDate = (d: Date) => {
         .cn-label[data-label="R"] {
             animation-delay: -1.5s, -3.2s;
         }
-        .cn-en {
+        .cn-en,
+        .cn-meta {
             animation: cn-label-twinkle 3.6s ease-in-out infinite;
         }
         .cn-right .cn-en {
