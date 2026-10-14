@@ -133,7 +133,7 @@ const formatDate = (d: Date) => {
 
     <!-- 左侧：博客节点（8 个圆点池，最旧一篇在最下面，越新越往上） -->
     {Array.from({ length: NODE_COUNT }).map((_, j) => {
-        const post = posts[j];
+        const post = posts[j - Math.max(0, NODE_COUNT - posts.length)];
         const dx = chainDx(NODE_SLOT0 + j);
         const chainYv = chainY(NODE_SLOT0 + j);
         const y = 100 - chainYv; // 上下镜像：链条坐标越大 = 越新 → 屏幕上越靠上
@@ -236,6 +236,7 @@ const formatDate = (d: Date) => {
 		const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 		const POST_LIST = POSTS || [];
 		const MAX_OFF = Math.max(0, POST_LIST.length - VISIBLE_SLOTS);
+		const SINK = Math.max(0, NODE_COUNT - POST_LIST.length); // 不足 8 篇时整体下沉，最早的在最下面
 		const fadeAt = (y) => Math.max(0.12, Math.min(1, (y - 14) / 26));
 
 		// 每个锚点自己的浮动参数（幅度调大了，飘动更明显）
@@ -489,7 +490,7 @@ const formatDate = (d: Date) => {
 
 				// 8 个圆点坐在槽位 1..8 的转折点上，第 j 个 = 第 floor(offCur)+j 篇
 				for (let j = 0; j < dots.L.length; j++) {
-					const item = { dot: dots.L[j], k: first + j, post: POST_LIST[first + j] };
+					const item = { dot: dots.L[j], k: first + j, post: POST_LIST[first + j - SINK] };
 					const st = dotState[j] || (dotState[j] = { calm: 0, k: null });
 					const xy = pos[j + dotOffset];
 					if (!item.post || xy[1] < -6 || xy[1] > 104) {
