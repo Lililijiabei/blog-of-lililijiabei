@@ -1,29 +1,223 @@
 ---
-import PhotoCard from "../../components/PhotoCard.astro";
 import MainGridLayout from "../../layouts/MainGridLayout.astro";
-import { getSortedPhotos } from "../../utils/photo-utils";
 import { getPhotoUrlBySlug } from "../../utils/url-utils";
+import { resolveRawImagePath } from "../../utils/raw-image-resolver";
 
-const photos = await getSortedPhotos();
+// ── 可调参数 ──────────────────────────────────────────────
+// "2026" 的像素底图：7 行 × 19 列，'1' 放一张照片格，'0' 留空。
+// 每个数字占 4 列，数字之间用 1 列空格隔开；"0" 和 "6" 的角已填满，都是方方正正的。
+const BITMAP = [
+  "1111011110111101111",
+  "0001010010000101000",
+  "0001010010000101000",
+  "1111010010111101111",
+  "1000010010100001001",
+  "1000010010100001001",
+  "1111011110111101111",
+];
+
+// 每格照片比例：3:4（竖向）
+const CELL_W = 3;
+const CELL_H = 4;
+
+// 相邻格子是否合并：1 = 每格一张照片（当前）；改成 2 会合并出更大的格子。
+const MAX_SPAN = 1;
+
+// 演示图片放在第几个格子（0 起），点击后进入照片详情页
+const DEMO_TILE_INDEX = 0;
+const DEMO_PHOTO_SLUG = "demo/demo";
+const demoPhotoUrl = getPhotoUrlBySlug(DEMO_PHOTO_SLUG);
+// 演示照片的图片（与 demo.md 的 image 字段对应）
+const demoImageUrl = resolveRawImagePath("content/photos/demo/1.jpg");
+
+const COLS = BITMAP[0].length;
+const ROWS = BITMAP.length;
+
+type Tile = { row: number; col: number; rowSpan: number; colSpan: number };
+const tiles: Tile[] = [];
+const grid = BITMAP.map((line) => [...line]);
+const used = Array.from({ length: ROWS }, () => Array<boolean>(COLS).fill(false));
+
+for (let r = 0; r < ROWS; r++) {
+  for (let c = 0; c < COLS; c++) {
+    if (grid[r][c] !== "1" || used[r][c]) continue;
+
+    let cEnd = c;
+    while (
+      cEnd + 1 < COLS &&
+      cEnd - c + 1 < MAX_SPAN &&
+      grid[r][cEnd + 1] === "1" &&
+      !used[r][cEnd + 1]
+    ) {
+      cEnd++;
+    }
+
+    let rEnd = r;
+    while (rEnd + 1 < ROWS && rEnd - r + 1 < MAX_SPAN) {
+      let ok = true;
+      for (let cc = c; cc <= cEnd; cc++) {
+        if (grid[rEnd + 1][cc] !== "1" || used[rEnd + 1][cc]) {
+          ok = false;
+          break;
+        }
+      }
+      if (!ok) break;
+      rEnd++;
+    }
+
+    for (let rr = r; rr <= rEnd; rr++) {
+      for (let cc = c; cc <= cEnd; cc++) {
+        used[rr][cc] = true;
+      }
+    }
+    tiles.push({ row: r, col: c, rowSpan: rEnd - r + 1, colSpan: cEnd - c + 1 });
+  }
+}
+
+// 每张照片的浮动参数：横/竖幅度、时长、延迟都略不同，避免整齐划一
+const rand = (seed: number) => {
+  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+const floatParams = tiles.map((_, i) => ({
+  ampX: (1.5 + rand(i) * 1.5).toFixed(2), // 1.5–3px（避免互相碰到）
+  ampY: (1.5 + rand(i * 1.3) * 1.5).toFixed(2), // 1.5–3px
+  duration: (4.5 + rand(i * 1.7) * 2).toFixed(2), // 4.5–6.5s
+  delay: (-rand(i * 2.3) * 6).toFixed(2), // 负延迟，错开相位
+}));
 ---
 
-<MainGridLayout title="相册" description="相册 - 一些随手拍的照片">
-    <div class="transition flex flex-col rounded-[var(--radius-large)] bg-[var(--card-bg)] py-1 md:py-0 md:bg-transparent md:gap-4 mb-4">
-        {photos.map((entry, i) => (
-            <PhotoCard
-                entry={entry}
-                title={entry.data.title}
-                tags={entry.data.tags}
-                category={entry.data.category}
-                published={entry.data.published}
-                updated={entry.data.updated}
-                url={getPhotoUrlBySlug(entry.slug)}
-                image={entry.data.image}
-                description={entry.data.description}
-                draft={entry.data.draft}
-                class:list="onload-animation"
-                style={`animation-delay: calc(var(--content-delay) + ${i * 50}ms);`}
-            />
-        ))}
+<MainGridLayout title="相册" description="相册 · 2026 照片墙">
+  <!-- 照片直接浮在界面中间，无背景框；四周留出一点空间给浮动/放大，避免被裁掉 -->
+  <div class="w-full mt-[1cm] px-3 py-3">
+    <div
+      class="album-grid"
+      style={`grid-template-columns: repeat(${COLS}, minmax(0, 1fr)); grid-template-rows: repeat(${ROWS}, minmax(0, 1fr)); aspect-ratio: ${COLS * CELL_W} / ${ROWS * CELL_H};`}
+    >
+      {tiles.map((tile, i) => {
+        const style = `grid-column: ${tile.col + 1} / span ${tile.colSpan}; grid-row: ${tile.row + 1} / span ${tile.rowSpan}; --float-amp-x: ${floatParams[i].ampX}px; --float-amp-y: ${floatParams[i].ampY}px; --float-duration: ${floatParams[i].duration}s; --float-delay: ${floatParams[i].delay}s;`;
+        return i === DEMO_TILE_INDEX ? (
+          <a
+            href={demoPhotoUrl}
+            class="album-tile has-photo"
+            style={`${style} background-image: url(${demoImageUrl});`}
+          ></a>
+        ) : (
+          <div class="album-tile" style={style}></div>
+        );
+      })}
     </div>
+  </div>
 </MainGridLayout>
+
+<style>
+  @property --tile-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+  }
+
+  .album-grid {
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  @media (min-width: 768px) {
+    .album-grid {
+      gap: 0.5rem;
+    }
+  }
+
+  .album-tile {
+    position: relative;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background-color: rgba(156, 163, 175, 0.16);
+
+    animation: album-float var(--float-duration, 5s) ease-in-out
+      var(--float-delay, 0s) infinite;
+    will-change: translate;
+
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+
+  .album-tile.has-photo {
+    background-size: cover;
+    background-position: center;
+  }
+
+  /* hover 时出现一圈圈旋转的紫色渐变边框 */
+  .album-tile::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: 0.5rem;
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--tile-angle),
+      #c4b5fd,
+      #a855f7,
+      #7c3aed,
+      #6d28d9,
+      #8b5cf6,
+      #c4b5fd
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    animation: none;
+    pointer-events: none;
+  }
+
+  .album-tile:hover {
+    transform: scale(1.12);
+    border-color: transparent;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+    z-index: 1;
+  }
+
+  .album-tile:hover::after {
+    opacity: 1;
+    animation: tile-spin 2.5s linear infinite;
+  }
+
+  /* 上下左右四个方向循环浮动（菱形轨迹） */
+  @keyframes album-float {
+    0%,
+    100% {
+      translate: 0 calc(var(--float-amp-y, 3px) * -1);
+    }
+    25% {
+      translate: var(--float-amp-x, 2px) 0;
+    }
+    50% {
+      translate: 0 var(--float-amp-y, 3px);
+    }
+    75% {
+      translate: calc(var(--float-amp-x, 2px) * -1) 0;
+    }
+  }
+
+  @keyframes tile-spin {
+    to {
+      --tile-angle: 360deg;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .album-tile,
+    .album-tile::after {
+      animation: none;
+    }
+  }
+</style>
