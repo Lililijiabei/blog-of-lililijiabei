@@ -1,0 +1,29 @@
+---
+import PhotoCard from "../../components/PhotoCard.astro";
+import MainGridLayout from "../../layouts/MainGridLayout.astro";
+import { getSortedPhotos } from "../../utils/photo-utils";
+import { getPhotoUrlBySlug } from "../../utils/url-utils";
+
+const photos = await getSortedPhotos();
+---
+
+<MainGridLayout title="相册" description="相册 - 一些随手拍的照片">
+    <div class="transition flex flex-col rounded-[var(--radius-large)] bg-[var(--card-bg)] py-1 md:py-0 md:bg-transparent md:gap-4 mb-4">
+        {photos.map((entry, i) => (
+            <PhotoCard
+                entry={entry}
+                title={entry.data.title}
+                tags={entry.data.tags}
+                category={entry.data.category}
+                published={entry.data.published}
+                updated={entry.data.updated}
+                url={getPhotoUrlBySlug(entry.slug)}
+                image={entry.data.image}
+                description={entry.data.description}
+                draft={entry.data.draft}
+                class:list="onload-animation"
+                style={`animation-delay: calc(var(--content-delay) + ${i * 50}ms);`}
+            />
+        ))}
+    </div>
+</MainGridLayout>

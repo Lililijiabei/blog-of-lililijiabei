@@ -50,6 +50,10 @@ const subtitle = hero.subtitle || siteConfig.subtitle;
                 <Icon name="fa6-regular:address-card" class="text-[1.15rem]"></Icon>
                 {i18n(I18nKey.about)}
             </a>
+            <a href={url("/photos/")} class="btn-regular rounded-lg h-11 gap-2 px-5 font-bold active:scale-95">
+                <Icon name="fa6-regular:images" class="text-[1.15rem]"></Icon>
+                相册
+            </a>
             {latestPostUrl && (
                 <a href={latestPostUrl} class="btn-plain border border-[var(--line-color)] rounded-lg h-11 gap-2 px-5 font-bold active:scale-95">
                     {i18n(I18nKey.recentPosts)}

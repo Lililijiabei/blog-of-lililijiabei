@@ -36,7 +36,7 @@ const imageMap: Record<string, string> = {};
 const allFiles = { ...imageFiles, ...imageFiles2, ...imageFiles3, ...imageFiles4, ...imageFiles5, ...imageFiles6, ...imageFiles7 };
 for (const [key, value] of Object.entries(allFiles)) {
 	const normalized = key.replace(/\\/g, "/");
-	imageMap[normalized] = value as string;
+	imageMap[normalized] = value.src;
 }
 
 
