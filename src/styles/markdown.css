@@ -3,6 +3,24 @@
 @tailwind components;
 @tailwind utilities; */
 
+/* ═══════════ 赛博日记 / 正文强调色：紫（跟随站点 --hue 300 的紫调） ═══════════ */
+:root {
+    --hl-text: oklch(0.45 0.19 306);
+    --hl-bg: oklch(0.955 0.045 306);
+    --hl-line: oklch(0.87 0.07 306);
+    --me-bg: oklch(0.94 0.012 300);
+    --me-text: oklch(0.34 0.02 300);
+    --me-line: oklch(0.86 0.015 300);
+}
+:root.dark {
+    --hl-text: oklch(0.85 0.13 306);
+    --hl-bg: oklch(0.33 0.075 306);
+    --hl-line: oklch(0.46 0.09 306);
+    --me-bg: oklch(0.29 0.012 300);
+    --me-text: oklch(0.88 0.012 300);
+    --me-line: oklch(0.38 0.015 300);
+}
+
 .custom-md {
     h1 {
         @apply text-3xl;
@@ -114,6 +132,11 @@
             @apply my-0;
         }
 
+        /* 引用里空一行 = 分段，段落间距跟正文里完全一致（1.25em） */
+        &:not(.admonition) > p + p {
+            margin-top: 1.25em;
+        }
+
         &:before {
             @apply content-[''] absolute left-2 top-3 bottom-3 w-1 rounded-full;
             background-image: var(--title-gradient);
@@ -167,6 +190,64 @@
     .reveal.revealed {
         opacity: 1;
         transform: none;
+    }
+
+    /* ─────────── 重点句：加粗即变紫（**文字**） ─────────── */
+    strong, b {
+        color: var(--hl-text);
+        font-weight: 600;
+        letter-spacing: 0.01em;
+    }
+
+    /* ─────────── 行内高亮：:hl[文字]，淡紫底色 ─────────── */
+    .md-hl {
+        color: var(--hl-text);
+        background: var(--hl-bg);
+        border-radius: 0.4rem;
+        padding: 0.06em 0.34em;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+    }
+
+    /* ─────────── 引用块 = 它对你说的话，右上角自动挂「它」 ─────────── */
+    blockquote:not(.admonition)::after {
+        content: '它';
+        position: absolute;
+        top: -0.72rem;
+        right: 1rem;
+        padding: 0 0.6rem;
+        font-size: 0.7rem;
+        font-style: normal;
+        line-height: 1.7;
+        letter-spacing: 0.12em;
+        color: var(--hl-text);
+        background: var(--card-bg);
+        border: 1px solid var(--hl-line);
+        border-radius: 999px;
+        pointer-events: none;
+    }
+
+    /* ─────────── 我说的：:me[文字]，灰色小气泡 + 「我 ·」 ─────────── */
+    .md-me {
+        color: var(--me-text);
+        background: var(--me-bg);
+        border-radius: 0.6rem;
+        padding: 0.1em 0.5em;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+
+        &::before {
+            content: '我 · ';
+            color: var(--hl-text);
+            font-size: 0.85em;
+            letter-spacing: 0.08em;
+            font-weight: 600;
+        }
+    }
+
+    /* 整段只有一句话是我说的：贴右对齐，像个对话气泡 */
+    p:has(> .md-me:only-child) {
+        text-align: right;
     }
     
 }

@@ -22,6 +22,7 @@ import { pluginLanguageBadge } from "./src/plugins/expressive-code/language-badg
 import { AdmonitionComponent } from "./src/plugins/rehype-component-admonition.mjs";
 import { GithubCardComponent } from "./src/plugins/rehype-component-github-card.mjs";
 import { parseDirectiveNode } from "./src/plugins/remark-directive-rehype.js";
+import { remarkDialogue } from "./src/plugins/remark-dialogue.mjs";
 import { remarkExcerpt } from "./src/plugins/remark-excerpt.js";
 import { remarkRawImage } from "./src/plugins/remark-raw-image.mjs";
 import { remarkReadingTime } from "./src/plugins/remark-reading-time.mjs";
@@ -125,6 +126,8 @@ export default defineConfig({
 			remarkRawImage,
 			remarkSectionize,
 			parseDirectiveNode,
+			// 必须排在 parseDirectiveNode 之后，否则 :me[]/:hl[] 的 hName 会被覆盖回指令名
+			remarkDialogue,
 		],
 		rehypePlugins: [
 			rehypeKatex,
