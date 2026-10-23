@@ -24,8 +24,8 @@ const CELL_H = 4;
 // 相邻格子是否合并：1 = 每格一张照片（当前）；改成 2 会合并出更大的格子。
 const MAX_SPAN = 1;
 
-// 照片按发布时间从新到旧，依次填进照片墙的格子（0 起），点击进入照片详情页
-const photos = (await getSortedPhotosList()).map((photo) => ({
+// 照片按发布时间从旧到新，依次填进照片墙的格子（0 起），点击进入照片详情页
+const photos = (await getSortedPhotosList()).reverse().map((photo) => ({
   url: getPhotoUrlBySlug(photo.slug),
   image: photo.data.image
     ? resolveRawImagePath(
