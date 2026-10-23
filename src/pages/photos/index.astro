@@ -1,7 +1,8 @@
 ---
 import MainGridLayout from "../../layouts/MainGridLayout.astro";
-import { getPhotoUrlBySlug } from "../../utils/url-utils";
+import { getDir, getPhotoUrlBySlug } from "../../utils/url-utils";
 import { resolveRawImagePath } from "../../utils/raw-image-resolver";
+import { getSortedPhotosList } from "../../utils/photo-utils";
 
 // ── 可调参数 ──────────────────────────────────────────────
 // "2026" 的像素底图：7 行 × 19 列，'1' 放一张照片格，'0' 留空。
@@ -23,12 +24,15 @@ const CELL_H = 4;
 // 相邻格子是否合并：1 = 每格一张照片（当前）；改成 2 会合并出更大的格子。
 const MAX_SPAN = 1;
 
-// 演示图片放在第几个格子（0 起），点击后进入照片详情页
-const DEMO_TILE_INDEX = 0;
-const DEMO_PHOTO_SLUG = "demo/demo";
-const demoPhotoUrl = getPhotoUrlBySlug(DEMO_PHOTO_SLUG);
-// 演示照片的图片（与 demo.md 的 image 字段对应）
-const demoImageUrl = resolveRawImagePath("content/photos/demo/1.jpg");
+// 照片按发布时间从新到旧，依次填进照片墙的格子（0 起），点击进入照片详情页
+const photos = (await getSortedPhotosList()).map((photo) => ({
+  url: getPhotoUrlBySlug(photo.slug),
+  image: photo.data.image
+    ? resolveRawImagePath(
+        `content/photos/${getDir(photo.slug)}${photo.data.image}`,
+      )
+    : null,
+}));
 
 const COLS = BITMAP[0].length;
 const ROWS = BITMAP.length;
@@ -97,11 +101,13 @@ const floatParams = tiles.map((_, i) => ({
     >
       {tiles.map((tile, i) => {
         const style = `grid-column: ${tile.col + 1} / span ${tile.colSpan}; grid-row: ${tile.row + 1} / span ${tile.rowSpan}; --float-amp-x: ${floatParams[i].ampX}px; --float-amp-y: ${floatParams[i].ampY}px; --float-duration: ${floatParams[i].duration}s; --float-delay: ${floatParams[i].delay}s;`;
-        return i === DEMO_TILE_INDEX ? (
+        const photo = photos[i];
+        return photo?.image ? (
           <a
-            href={demoPhotoUrl}
+            href={photo.url}
+            aria-label="查看照片"
             class="album-tile has-photo"
-            style={`${style} background-image: url(${demoImageUrl});`}
+            style={`${style} background-image: url(${photo.image});`}
           ></a>
         ) : (
           <div class="album-tile" style={style}></div>
