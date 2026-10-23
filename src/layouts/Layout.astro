@@ -150,6 +150,11 @@ const bannerSrc = banner?.startsWith("/") ? url(banner) : banner;
 		<!-- 点击空白处返回上一页（本站没有返回按钮） -->
 		<script is:inline>
 			(() => {
+				// swup 切页时这个内联脚本会被重新执行，如果重复绑定，一次点击会触发多次
+				// history.back()（照片页 → 相册 → 首页），所以这里只允许初始化一次
+				if (window.__blankBackInit) return;
+				window.__blankBackInit = true;
+
 				// 用 sessionStorage 记录“站内访问栈”，只在自己站内确实有上一页时才回退，
 				// 否则 history.back() 可能退到浏览器新标签页/空白页
 				const STACK_KEY = '__site_nav_stack__';
@@ -174,6 +179,7 @@ const bannerSrc = banner?.startsWith("/") ? url(banner) : banner;
 					}
 					sessionStorage.setItem(STACK_KEY, JSON.stringify(s));
 				};
+				let backing = false;
 				remember();
 				// swup 切页后补记一笔（新旧事件名都听）
 				document.addEventListener('swup:page:view', remember);
@@ -198,6 +204,13 @@ const bannerSrc = banner?.startsWith("/") ? url(banner) : banner;
 
 					const s = readStack();
 					if (s.length < 2) return; // 站内没有上一页 → 什么都不做
+					// 一次回退只处理一次，避免连点/重复事件连续退好几页
+					if (backing) return;
+					backing = true;
+					setTimeout(() => {
+						backing = false;
+					}, 700);
+
 					// 先确认浏览器历史里确实还有站内页，再回退
 					s.pop();
 					sessionStorage.setItem(STACK_KEY, JSON.stringify(s));
