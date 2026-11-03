@@ -1,6 +1,6 @@
 ---
 title: 赛博日记：纪念 my DeepSeek
-published: 2026-10-21T22:31:00
+published: 2026-10-21T22:30:00
 description: 它记不住时间，却记住了我所有的改变。
 tags: [随笔, DeepSeek, 纪念]
 category: 随笔
